@@ -20,7 +20,7 @@
 Ticker tick;
 
 
-U8G2_ST7565_ERC12864_F_4W_SW_SPI u8g2(U8G2_R2,/* clock=*/ 12, /* data=*/ 14, /* cs=*/ 15, /* dc=*/ 2, /* reset=*/ 13);
+U8G2_ST7565_ERC12864_F_4W_SW_SPI u8g2(U8G2_R2,/* clock=*/ 33, /* data=*/ 14, /* cs=*/ 15, /* dc=*/ 2, /* reset=*/ 13);
 
 //GSM credentials
 const char apn[]  = "povo.jp";
@@ -101,6 +101,17 @@ int   second    = 0;
 unsigned long gpsInterval = 5000;
 unsigned long gpsCurrTime = 0;
 unsigned long gpsPrevTime = 0;
+
+//Http Client
+const char serverAddress[] = "dweet.io";  // server address
+const int port = 80;
+
+String dweetName = "possibility-realize-galaxy";
+String path = "/dweet/for/" + dweetName;
+String contentType = "application/json";
+
+//TinyGsmClient client(modem);
+//HttpClient    http(client, serverAddress, port);
 
 I2C_AXP192 axp192(I2C_AXP192_DEFAULT_ADDRESS, Wire1);
 
@@ -221,26 +232,26 @@ void setup() {
   }, CHANGE);
 
   SerialMon.println("Wait...");
-  // u8g2.setFont(u8g2_font_5x7_mr);
-  // u8g2.setCursor(12,10);
-  // u8g2.print("Wait...              ");
-  // u8g2.sendBuffer();
+  u8g2.setFont(u8g2_font_5x7_mr);
+  u8g2.setCursor(12,10);
+  u8g2.print("Wait...              ");
+  u8g2.sendBuffer();
 
   delay(3000);
 
   SerialAT.begin(UART_BAUD, SERIAL_8N1, PIN_RX, PIN_TX);
 
   //モデムの初期化
-  // u8g2.setCursor(12,10);
-  // u8g2.print("Initializing modem...");
-  // u8g2.sendBuffer();
+  u8g2.setCursor(12,10);
+  u8g2.print("Initializing modem...");
+  u8g2.sendBuffer();
 
   SerialMon.println("Initializing modem...");
   if (!modem.init()) {
     SerialMon.println("Failed to restart modem, delaying 10s and retrying");
-    // u8g2.setCursor(12,10);
-    // u8g2.print("Modem init failed  ");
-    // u8g2.sendBuffer();
+    u8g2.setCursor(12,10);
+    u8g2.print("Modem init failed  ");
+    u8g2.sendBuffer();
     return;
   }
   SerialMon.println("enter setNetwork Mode");
@@ -249,9 +260,9 @@ void setup() {
   bool result;
   do {
     result = modem.setNetworkMode(38);//2 Automatic, 13 GSM only,  38 LTE only,  51 GSM and LTE only
-    // u8g2.setCursor(12,10);
-    // u8g2.print("Network: LTE only  ");
-    // u8g2.sendBuffer();
+    u8g2.setCursor(12,10);
+    u8g2.print("Network: LTE only  ");
+    u8g2.sendBuffer();
     delay(500);
   } while (result != true);
 
@@ -259,25 +270,25 @@ void setup() {
   if (!modem.waitForNetwork()) {
     delay(10000);
     SerialMon.println("waitForNetwork");
-    // u8g2.setCursor(12,10);
-    // u8g2.print("Wait for network   ");
-    // u8g2.sendBuffer();
+    u8g2.setCursor(12,10);
+    u8g2.print("Wait for network   ");
+    u8g2.sendBuffer();
     return;
   }
 
   if (modem.isNetworkConnected()) {
     SerialMon.println("Network connected");
-    // u8g2.setCursor(12,10);
-    // u8g2.print("Network connected  ");
-    // u8g2.sendBuffer();
+    u8g2.setCursor(12,10);
+    u8g2.print("Network connected  ");
+    u8g2.sendBuffer();
   }
-  // u8g2.setFont(u8g2_font_open_iconic_www_1x_t);
-  // if(isNetworkConnected){
-  //   u8g2.drawGlyph(2,10,0x0051); //Connected
-  // }else{
-  //   u8g2.drawGlyph(2,10,0x0048); //Disconnected
-  // }
-  // u8g2.sendBuffer();
+  u8g2.setFont(u8g2_font_open_iconic_www_1x_t);
+  if(isNetworkConnected){
+    u8g2.drawGlyph(2,10,0x0051); //Connected
+  }else{
+    u8g2.drawGlyph(2,10,0x0048); //Disconnected
+  }
+  u8g2.sendBuffer();
 
   SerialMon.print("Connecting to:");
   SerialMon.println(apn);
@@ -298,22 +309,22 @@ void setup() {
   SerialMon.print("Signal quality:");
   SerialMon.println(csq);
 
-  // u8g2.setFont(u8g2_font_5x7_mr);
+  u8g2.setFont(u8g2_font_5x7_mr);
 
-  // u8g2.setCursor(12,20);
-  // u8g2.print("Connecting to:  ");
-  // u8g2.print(apn);
+  u8g2.setCursor(12,20);
+  u8g2.print("Connecting to:  ");
+  u8g2.print(apn);
 
-  // u8g2.setCursor(12,28);
-  // u8g2.print("Local IP:");
-  // u8g2.setCursor(20,36);
-  // u8g2.print(local);
+  u8g2.setCursor(12,28);
+  u8g2.print("Local IP:");
+  u8g2.setCursor(20,36);
+  u8g2.print(local);
 
-  // u8g2.setCursor(12,44);
-  // u8g2.print("Signal quality:");
-  // u8g2.print(csq);
+  u8g2.setCursor(12,44);
+  u8g2.print("Signal quality:");
+  u8g2.print(csq);
 
-  // u8g2.sendBuffer();
+  u8g2.sendBuffer();
 
   //GPS enable
   modem.enableGPS();
@@ -324,17 +335,21 @@ void setup() {
   pinMode(32, INPUT);
   attachInterrupt(32, timeInterval, RISING);
 
-  // u8g2.clearDisplay();
-  delay(100);
+  // // u8g2.clearDisplay();
+  // delay(100);
+  // u8g2.begin();
+  // u8g2.setContrast(15);
+  // u8g2.clearBuffer();
+
 }
 
 void loop() {
   // put your main code here, to run repeated
+  dispCurrTime = millis();
+  if((dispCurrTime - dispPrevTime) >= dispInterval){
+    u8g2.firstPage();
+    do {
     
-  u8g2.firstPage();
-  do {
-    dispCurrTime = millis();
-    if((dispCurrTime - dispPrevTime) >= dispInterval){
       unsigned long spdDiffTime = spdCurrTime - spdPrevTime;
       if(spdDiffTime > 0){        
         wheelSpeed = (0.55 * 3.14 * 3.6 * 1000) / (spdDiffTime);
@@ -389,40 +404,66 @@ void loop() {
         u8g2.drawGlyph(80, 45,0x0044); //paused
       }
       
-      }
-    dispPrevTime = dispCurrTime;
+      } while ( u8g2.nextPage() );
+      dispPrevTime = dispCurrTime;
 
-    battCurrTime = millis();
-    if((battCurrTime - battPrevTime) >= battInterval){
-      noInterrupts();
-      batVoltage = axp192.getBatteryVoltage();
-      batVbusVol = axp192.getVbusVoltage();
-      interrupts();
-      if(batVbusVol >= 200){
-        battIsCharge = true;
-      }else{
-        battIsCharge = false;
-      }
-      batCapacity = 100 * (batVoltage - minBatVol)/(maxBatVol - minBatVol);
-      battPrevTime = battCurrTime;
-      //Serial.printf("BatteryVoltage : %7.2f\n", batVoltage);
+  }
+
+  battCurrTime = millis();
+  if((battCurrTime - battPrevTime) >= battInterval){
+    noInterrupts();
+    batVoltage = axp192.getBatteryVoltage();
+    batVbusVol = axp192.getVbusVoltage();
+    interrupts();
+    if(batVbusVol >= 200){
+      battIsCharge = true;
+    }else{
+      battIsCharge = false;
     }
+    batCapacity = 100 * (batVoltage - minBatVol)/(maxBatVol - minBatVol);
+    battPrevTime = battCurrTime;
+    //Serial.printf("BatteryVoltage : %7.2f\n", batVoltage);
+  }
 
-  } while ( u8g2.nextPage() );
+  gpsCurrTime = millis();
+  if((gpsCurrTime - gpsPrevTime) >= gpsInterval){
+    if(modem.getGPS(&lat, &lon, &speed, &alt, &vsat, &usat, &accuracy, &year, &month, &day, &hour, &minute, &second)){
+      Serial.printf("Lat:%f lon:%f\n", lat, lon);
+      Serial.printf("%d/%d/%d ", year, month, day);
+      Serial.printf("%d:%d:%d \n", hour, minute, second);
+      tick.attach_ms(200, []() {
+              digitalWrite(LED_PIN, !digitalRead(LED_PIN));
+      });
+    }else{
+      Serial.printf("GPS no data\n");
+    }
+    // TinyGsmClient client(modem);
+    // HttpClient    http(client, serverAddress, port);
+    // //http.connectionKeepAlive();
+    // String postData = "{\"Speed\":\"";//"{\"Latitude\":\"";
+    // // postData += lat;
+    // // postData += "\",\"Longtitude\":\"";
+    // // postData += lon;
+    // // postData += "\",\"Speed\":\"";
+    // postData += (int)WheelAvg;
+    // // postData += "\",\"Battery\":\"";
+    // // postData += batCapacity;
+    // postData += "\"}";
+    
+    // //Serial.printf("making POST request\n");
+    // //Serial.printf("json message: %s\n", postData);
 
-  // gpsCurrTime = millis();
-  // if((gpsCurrTime - gpsPrevTime) >= 5000){
-  //   if(modem.getGPS(&lat, &lon, &speed, &alt, &vsat, &usat, &accuracy, &year, &month, &day, &hour, &minute, &second)){
-  //     Serial.printf("Lat:%f lon:%f\n", lat, lon);
-  //     Serial.printf("%d/%d/%d ", year, month, day);
-  //     Serial.printf("%d:%d:%d \n", hour, minute, second);
-  //     tick.attach_ms(200, []() {
-  //             digitalWrite(LED_PIN, !digitalRead(LED_PIN));
-  //     });
-  //   }else{
-  //     Serial.printf("GPS no data\n");
-  //   }
-  //   gpsCurrTime = gpsPrevTime;
-  // }
+    // http.post(path, contentType, postData);
+
+    // int statusCode = http.responseStatusCode();
+    // String response = http.responseBody();
+
+    // Serial.printf("Status Code: %s\n", statusCode);
+    // Serial.printf("Response: %s\n", response);
+
+    // http.stop();
+
+    gpsPrevTime = gpsCurrTime;
+  }
 
 }
