@@ -20,7 +20,7 @@
 Ticker tick;
 
 
-U8G2_ST7565_ERC12864_F_4W_SW_SPI u8g2(U8G2_R2,/* clock=*/ 33, /* data=*/ 14, /* cs=*/ 15, /* dc=*/ 2, /* reset=*/ 13);
+U8G2_ST7565_ERC12864_F_4W_SW_SPI u8g2(U8G2_R0,/* clock=*/ 33, /* data=*/ 14, /* cs=*/ 15, /* dc=*/ 2, /* reset=*/ 13);
 
 //GSM credentials
 const char apn[]  = "povo.jp";
@@ -61,7 +61,7 @@ const int meterWid = 10;
 
 //Update Battery
 bool battIsCharge = false;
-unsigned long battInterval = 5000;
+unsigned long battInterval = 10000;
 unsigned long battCurrTime = 0;
 unsigned long battPrevTime = 0;
 
@@ -78,6 +78,7 @@ const float spdMin = 0.0f;
 
 unsigned long spdCurrTime = 0;
 unsigned long spdPrevTime = 0;
+unsigned long spdDiffTime = 0;
 float wheelSpeed = 0.0f;
 float WheelAvg = 0.0f;
 float spdAvg[sample] = {0};
@@ -98,7 +99,7 @@ int   hour      = 0;
 int   minute    = 0;
 int   second    = 0;
 
-unsigned long gpsInterval = 5000;
+unsigned long gpsInterval = 1500;
 unsigned long gpsCurrTime = 0;
 unsigned long gpsPrevTime = 0;
 
@@ -109,9 +110,10 @@ const int port = 80;
 String dweetName = "possibility-realize-galaxy";
 String path = "/dweet/for/" + dweetName;
 String contentType = "application/json";
+String postData;
 
-//TinyGsmClient client(modem);
-//HttpClient    http(client, serverAddress, port);
+TinyGsmClient client(modem);
+// HttpClient    http = HttpClient(client, serverAddress, port);
 
 I2C_AXP192 axp192(I2C_AXP192_DEFAULT_ADDRESS, Wire1);
 
@@ -226,9 +228,9 @@ void setup() {
   attachInterrupt(IND_PIN, []() {
     detachInterrupt(IND_PIN);
     // If SIM7600 starts normally, then set the onboard LED to flash once every 1 second
-    tick.attach_ms(1000, []() {
-      digitalWrite(LED_PIN, !digitalRead(LED_PIN));
-    });
+    // tick.attach_ms(1000, []() {
+    //   digitalWrite(LED_PIN, !digitalRead(LED_PIN));
+    // });
   }, CHANGE);
 
   SerialMon.println("Wait...");
@@ -350,7 +352,7 @@ void loop() {
     u8g2.firstPage();
     do {
     
-      unsigned long spdDiffTime = spdCurrTime - spdPrevTime;
+      spdDiffTime = spdCurrTime - spdPrevTime;
       if(spdDiffTime > 0){        
         wheelSpeed = (0.55 * 3.14 * 3.6 * 1000) / (spdDiffTime);
         if(wheelSpeed >= 100){
@@ -427,10 +429,8 @@ void loop() {
 
   gpsCurrTime = millis();
   if((gpsCurrTime - gpsPrevTime) >= gpsInterval){
-    if(modem.getGPS(&lat, &lon, &speed, &alt, &vsat, &usat, &accuracy, &year, &month, &day, &hour, &minute, &second)){
+    if(modem.getGPS(&lat, &lon)){
       Serial.printf("Lat:%f lon:%f\n", lat, lon);
-      Serial.printf("%d/%d/%d ", year, month, day);
-      Serial.printf("%d:%d:%d \n", hour, minute, second);
       tick.attach_ms(200, []() {
               digitalWrite(LED_PIN, !digitalRead(LED_PIN));
       });
@@ -439,30 +439,36 @@ void loop() {
     }
     // TinyGsmClient client(modem);
     // HttpClient    http(client, serverAddress, port);
-    // //http.connectionKeepAlive();
-    // String postData = "{\"Speed\":\"";//"{\"Latitude\":\"";
+    //http.connectionKeepAlive();
+    // postData = "{\"Speed\":\"";//"{\"Latitude\":\"";
     // // postData += lat;
     // // postData += "\",\"Longtitude\":\"";
     // // postData += lon;
     // // postData += "\",\"Speed\":\"";
-    // postData += (int)WheelAvg;
+    // postData += spdTexbuf;
     // // postData += "\",\"Battery\":\"";
     // // postData += batCapacity;
     // postData += "\"}";
     
-    // //Serial.printf("making POST request\n");
-    // //Serial.printf("json message: %s\n", postData);
+    // // //Serial.printf("making POST request\n");
+    // Serial.printf("Average Speed: %s\n", spdTexbuf);
+    // Serial.printf("json message: %s\n", postData);
 
     // http.post(path, contentType, postData);
 
-    // int statusCode = http.responseStatusCode();
+    //int statusCode = http.responseStatusCode();
     // String response = http.responseBody();
 
     // Serial.printf("Status Code: %s\n", statusCode);
     // Serial.printf("Response: %s\n", response);
 
     // http.stop();
+    HttpClient    http = HttpClient(client, serverAddress, port);
 
+    int err = http.get("/dweet/for/possibility-realize-galaxy?Speed="+String((int)WheelAvg)+"&Latitude="+String(lat)+"&Longtitude="+String(lon));
+    if (err != 0) {
+      SerialMon.println("failed to connect");
+    }
     gpsPrevTime = gpsCurrTime;
   }
 
