@@ -23,9 +23,13 @@ Ticker tick;
 U8G2_ST7565_ERC12864_F_4W_SW_SPI u8g2(U8G2_R0,/* clock=*/ 33, /* data=*/ 14, /* cs=*/ 15, /* dc=*/ 2, /* reset=*/ 13);
 
 //GSM credentials
-const char apn[]  = "povo.jp";
-const char gprsUser[] = "";
-const char gprsPass[] = "";
+// const char apn[]  = "povo.jp";
+// const char gprsUser[] = "";
+// const char gprsPass[] = "";
+const char apn[]  = "iijmio.jp";
+const char gprsUser[] = "mio@iij";
+const char gprsPass[] = "iij";
+
 
 //Modem settings
 #define uS_TO_S_FACTOR          1000000ULL  //Conversion factor for micro seconds to seconds 
@@ -337,12 +341,6 @@ void setup() {
   pinMode(32, INPUT);
   attachInterrupt(32, timeInterval, RISING);
 
-  // // u8g2.clearDisplay();
-  // delay(100);
-  // u8g2.begin();
-  // u8g2.setContrast(15);
-  // u8g2.clearBuffer();
-
 }
 
 void loop() {
@@ -372,8 +370,6 @@ void loop() {
       WheelAvg = (float)WheelAvg/sample;
       drawMeter(WheelAvg);
       dtostrf(WheelAvg, 2, 0, spdTexbuf);
-      // drawMeter(wheelSpeed);
-      // dtostrf(wheelSpeed, 2, 0, spdTexbuf);
 
       u8g2.setFont(u8g2_font_logisoso32_tn);
       u8g2.drawStr(37, 58, spdTexbuf);
@@ -424,48 +420,27 @@ void loop() {
     }
     batCapacity = 100 * (batVoltage - minBatVol)/(maxBatVol - minBatVol);
     battPrevTime = battCurrTime;
-    //Serial.printf("BatteryVoltage : %7.2f\n", batVoltage);
   }
 
   gpsCurrTime = millis();
   if((gpsCurrTime - gpsPrevTime) >= gpsInterval){
-    if(modem.getGPS(&lat, &lon)){
-      Serial.printf("Lat:%f lon:%f\n", lat, lon);
-      tick.attach_ms(200, []() {
-              digitalWrite(LED_PIN, !digitalRead(LED_PIN));
-      });
-    }else{
-      Serial.printf("GPS no data\n");
-    }
-    // TinyGsmClient client(modem);
-    // HttpClient    http(client, serverAddress, port);
-    //http.connectionKeepAlive();
-    // postData = "{\"Speed\":\"";//"{\"Latitude\":\"";
-    // // postData += lat;
-    // // postData += "\",\"Longtitude\":\"";
-    // // postData += lon;
-    // // postData += "\",\"Speed\":\"";
-    // postData += spdTexbuf;
-    // // postData += "\",\"Battery\":\"";
-    // // postData += batCapacity;
-    // postData += "\"}";
-    
-    // // //Serial.printf("making POST request\n");
-    // Serial.printf("Average Speed: %s\n", spdTexbuf);
-    // Serial.printf("json message: %s\n", postData);
+    // if(modem.getGPS(&lat, &lon)){
+    //   Serial.printf("Lat:%f lon:%f\n", lat, lon);
+    //   tick.attach_ms(200, []() {
+    //           digitalWrite(LED_PIN, !digitalRead(LED_PIN));
+    //   });
+    // }else{
+    //   Serial.printf("GPS no data\n");
+    // }
 
-    // http.post(path, contentType, postData);
-
-    //int statusCode = http.responseStatusCode();
-    // String response = http.responseBody();
-
-    // Serial.printf("Status Code: %s\n", statusCode);
-    // Serial.printf("Response: %s\n", response);
-
-    // http.stop();
     HttpClient    http = HttpClient(client, serverAddress, port);
 
-    int err = http.get("/dweet/for/possibility-realize-galaxy?Speed="+String((int)WheelAvg)+"&Latitude="+String(lat)+"&Longtitude="+String(lon));
+    http.connectionKeepAlive();
+    int err = http.get("/dweet/for/possibility-realize-galaxy?Speed="+String((int)WheelAvg)+
+                                                          "&Latitude="+String(lat)+
+                                                          "&Longtitude="+String(lon)+
+                                                          "&Battery="+String(batCapacity)
+                                                          );
     if (err != 0) {
       SerialMon.println("failed to connect");
     }
