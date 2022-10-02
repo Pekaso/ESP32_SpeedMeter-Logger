@@ -9,6 +9,9 @@
 
 #define sample 20
 
+#define switch1 23
+#define switch2 19
+
 #include <Arduino.h>
 #include "I2C_AXP192.h"
 #include <SPI.h>
@@ -33,7 +36,7 @@ const char gprsPass[] = "iij";
 
 //Modem settings
 #define uS_TO_S_FACTOR          1000000ULL  //Conversion factor for micro seconds to seconds 
-#define TIME_TO_SLEEP           60          //Time ESP32 will go to sleep (in seconds) 
+//#define TIME_TO_SLEEP           60          //Time ESP32 will go to sleep (in seconds) 
 #define PIN_TX                  27
 #define PIN_RX                  26
 #define UART_BAUD               115200
@@ -80,6 +83,9 @@ bool sensorState = 0;
 const float spdMax = 70.0f;
 const float spdMin = 0.0f;
 
+const int zeroDet = 3;
+int zeroCnt = 0;
+
 unsigned long spdCurrTime = 0;
 unsigned long spdPrevTime = 0;
 unsigned long spdDiffTime = 0;
@@ -87,6 +93,17 @@ float wheelSpeed = 0.0f;
 float WheelAvg = 0.0f;
 float spdAvg[sample] = {0};
 char spdTexbuf[3];
+
+String dataPayload = "";
+
+//Timer
+bool isTimerStart = false;
+int timeInihold = 0;
+int timeElapsed = 0;
+int timeMinhold = 0;
+int timeSechold = 0;
+
+char timeTextbuf[5];
 
 //GPS data
 float lat       = 0;
@@ -103,7 +120,7 @@ int   hour      = 0;
 int   minute    = 0;
 int   second    = 0;
 
-unsigned long gpsInterval = 1500;
+unsigned long gpsInterval = 1000;
 unsigned long gpsCurrTime = 0;
 unsigned long gpsPrevTime = 0;
 
@@ -186,6 +203,8 @@ void setup() {
   u8g2.begin();
   u8g2.setContrast(15);
   u8g2.clearBuffer();
+
+  pinMode(switch1, INPUT_PULLUP);
   
   I2C_AXP192_InitDef initDef = {
     .EXTEN  = true,
@@ -359,6 +378,15 @@ void loop() {
       }
       spdPrevTime = spdCurrTime;
 
+      // if(wheelSpeed <= 4){
+      //   zeroCnt++;
+      //   if(zeroCnt >= zeroDet){
+      //     wheelSpeed = 0;
+      //   }
+      // }else{
+      //   zeroCnt = 0;
+      // }
+
       for(int i = sample - 1; i > 0; i--){
         spdAvg[i] = spdAvg[i-1];
       }
@@ -368,6 +396,31 @@ void loop() {
         WheelAvg += spdAvg[i];
       }
       WheelAvg = (float)WheelAvg/sample;
+
+      // if(WheelAvg >= 1){
+      //   WheelAvg -= WheelAvg - 1;
+      // }
+
+      if(digitalRead(switch1) == 0){
+        if(isTimerStart){
+          timeElapsed = millis() - timeInihold;
+          timeSechold = timeElapsed / 1000;
+          timeMinhold = timeSechold / 60;
+        }else{
+          isTimerStart = true;
+          timeElapsed = 0;
+          timeMinhold = 0;
+          timeMinhold = 0;
+          timeInihold = millis();
+        }
+      }else{
+        isTimerStart = false;
+      }
+
+      sprintf(timeTextbuf, "%02d:%02d", timeMinhold, (timeSechold)%60);
+
+      // Serial.printf("%d:%d\n", timeMinhold, (timeSechold)%60);
+
       drawMeter(WheelAvg);
       dtostrf(WheelAvg, 2, 0, spdTexbuf);
 
@@ -433,16 +486,52 @@ void loop() {
     //   Serial.printf("GPS no data\n");
     // }
 
+    // if(modem.getGsmLocation(&lat, &lon)){
+    //   Serial.printf("Lat:%f lon:%f\n", lat, lon);
+    //   tick.attach_ms(200, []() {
+    //           digitalWrite(LED_PIN, !digitalRead(LED_PIN));
+    //   });
+    // }else{
+    //   Serial.printf("GPS no data\n");
+    // }
+
+    // if (modem.isNetworkConnected()) {
+    // SerialMon.println("Network connected");
+    //   isNetworkConnected = true;
+    // }else{
+    //   isNetworkConnected = false;
+    // }
+
+    // Serial.printf("Switch1 (23pin):%d\n", digitalRead(23));
+
     HttpClient    http = HttpClient(client, serverAddress, port);
 
-    http.connectionKeepAlive();
-    int err = http.get("/dweet/for/possibility-realize-galaxy?Speed="+String((int)WheelAvg)+
-                                                          "&Latitude="+String(lat)+
-                                                          "&Longtitude="+String(lon)+
-                                                          "&Battery="+String(batCapacity)
-                                                          );
+    // Serial.println(timeTextbuf);
+
+    //http.connectionKeepAlive();
+    dataPayload = "/dweet/for/possibility-realize-galaxy?Time="+String(timeTextbuf)
+                                                          // "&Latitude="+String(lat)+
+                                                          // "&Longtitude="+String(lon)+
+                                                          // "&Time(Sec)="+String((int)timeSechold)+
+                                                          +"&Speed="+String((int)WheelAvg)
+                                                          +"&Battery="+String(batCapacity)
+                                                          ;
+
+    int err = http.get(dataPayload);
+
+    // int err = http.get("/dweet/for/possibility-realize-galaxy?Speed="+String((int)WheelAvg)+
+    //                                                       // "&Latitude="+String(lat)+
+    //                                                       // "&Longtitude="+String(lon)+
+    //                                                       // "&Time(Sec)="+String((int)timeSechold)+
+    //                                                       "&Time="+String(minTextbuf)+":"+String(secTextbuf)+
+    //                                                       "&Battery="+String(batCapacity)
+    //                                                       );
+ 
+ 
+    isDatabaseUploaded = true;
     if (err != 0) {
       SerialMon.println("failed to connect");
+      isDatabaseUploaded = false;
     }
     gpsPrevTime = gpsCurrTime;
   }
