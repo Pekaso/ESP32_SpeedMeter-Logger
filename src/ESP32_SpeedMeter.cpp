@@ -424,11 +424,14 @@ void loop() {
       drawMeter(WheelAvg);
       dtostrf(WheelAvg, 2, 0, spdTexbuf);
 
-      u8g2.setFont(u8g2_font_logisoso32_tn);
-      u8g2.drawStr(37, 58, spdTexbuf);
+      u8g2.setFont(u8g2_font_logisoso28_tn);
+      u8g2.drawStr(39, 47, spdTexbuf);
       u8g2.setFont(u8g2_font_t0_11b_te);
-      u8g2.setCursor(78,58);
+      u8g2.setCursor(76,47);
       u8g2.print("km/h");
+
+      u8g2.setFont(u8g2_font_mercutio_sc_nbp_tn);
+      u8g2.drawStr(56, 62, timeTextbuf);
 
       drawBattery(119, 22, battIsCharge, batCapacity);
       u8g2.setFont(u8g2_font_5x7_mr);
@@ -448,16 +451,25 @@ void loop() {
         u8g2.drawGlyph(12,10,0x0054); //Not Uploaded
       }
 
-      u8g2.setFont(u8g2_font_open_iconic_play_2x_t);
-      if(isLoggingStarted){
-        u8g2.drawGlyph(80, 45,0x0045); //Started
+      u8g2.setFont(u8g2_font_open_iconic_play_1x_t);
+      if(isTimerStart){
+        u8g2.drawGlyph(42, 61,0x0045); //Started
       }else{
-        u8g2.drawGlyph(80, 45,0x0044); //paused
+        u8g2.drawGlyph(42, 61,0x0044); //paused
       }
       
       } while ( u8g2.nextPage() );
-      dispPrevTime = dispCurrTime;
 
+      dataPayload = "/dweet/for/possibility-realize-galaxy?Time="+String(timeTextbuf)
+                                                      // "&Latitude="+String(lat)+
+                                                      // "&Longtitude="+String(lon)+
+                                                      // "&Time(Sec)="+String((int)timeSechold)+
+                                                      +"&Speed="+String((int)WheelAvg)
+                                                      +"&Battery="+String(batCapacity)
+                                                      ;
+
+
+      dispPrevTime = dispCurrTime;
   }
 
   battCurrTime = millis();
@@ -486,22 +498,6 @@ void loop() {
     //   Serial.printf("GPS no data\n");
     // }
 
-    // if(modem.getGsmLocation(&lat, &lon)){
-    //   Serial.printf("Lat:%f lon:%f\n", lat, lon);
-    //   tick.attach_ms(200, []() {
-    //           digitalWrite(LED_PIN, !digitalRead(LED_PIN));
-    //   });
-    // }else{
-    //   Serial.printf("GPS no data\n");
-    // }
-
-    // if (modem.isNetworkConnected()) {
-    // SerialMon.println("Network connected");
-    //   isNetworkConnected = true;
-    // }else{
-    //   isNetworkConnected = false;
-    // }
-
     // Serial.printf("Switch1 (23pin):%d\n", digitalRead(23));
 
     HttpClient    http = HttpClient(client, serverAddress, port);
@@ -509,13 +505,13 @@ void loop() {
     // Serial.println(timeTextbuf);
 
     //http.connectionKeepAlive();
-    dataPayload = "/dweet/for/possibility-realize-galaxy?Time="+String(timeTextbuf)
-                                                          // "&Latitude="+String(lat)+
-                                                          // "&Longtitude="+String(lon)+
-                                                          // "&Time(Sec)="+String((int)timeSechold)+
-                                                          +"&Speed="+String((int)WheelAvg)
-                                                          +"&Battery="+String(batCapacity)
-                                                          ;
+    // dataPayload = "/dweet/for/possibility-realize-galaxy?Time="+String(timeTextbuf)
+    //                                                       // "&Latitude="+String(lat)+
+    //                                                       // "&Longtitude="+String(lon)+
+    //                                                       // "&Time(Sec)="+String((int)timeSechold)+
+    //                                                       +"&Speed="+String((int)WheelAvg)
+    //                                                       +"&Battery="+String(batCapacity)
+    //                                                       ;
 
     int err = http.get(dataPayload);
 
@@ -526,7 +522,6 @@ void loop() {
     //                                                       "&Time="+String(minTextbuf)+":"+String(secTextbuf)+
     //                                                       "&Battery="+String(batCapacity)
     //                                                       );
- 
  
     isDatabaseUploaded = true;
     if (err != 0) {
