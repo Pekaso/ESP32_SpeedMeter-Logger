@@ -5,12 +5,11 @@
 
 #define TINY_GSM_DEBUG SerialMon //for serial console
 
-#define USE_GSM //Use SIM7600JC for GSM communication
-
 #define sample 20
 
 #define switch1 23
 #define switch2 19
+#define sensor 32
 
 #include <Arduino.h>
 #include "I2C_AXP192.h"
@@ -20,6 +19,15 @@
 #include <TinyGsmClient.h>
 #include <Ticker.h>
 #include <ArduinoHttpClient.h>
+
+#ifdef DUMP_AT_COMMANDS
+#include <StreamDebugger.h>
+StreamDebugger debugger(SerialAT, SerialMon);
+TinyGsm modem(debugger);
+#else
+TinyGsm modem(SerialAT);
+#endif
+
 Ticker tick;
 
 
@@ -45,7 +53,7 @@ const char gprsPass[] = "iij";
 #define POWER_PIN               25
 #define IND_PIN                 36
 
-TinyGsm modem(SerialAT);
+bool LED_STATS = false;
 
 //Update display
 unsigned long dispInterval = 100;
@@ -120,7 +128,7 @@ int   hour      = 0;
 int   minute    = 0;
 int   second    = 0;
 
-unsigned long gpsInterval = 1000;
+unsigned long gpsInterval = 2000;
 unsigned long gpsCurrTime = 0;
 unsigned long gpsPrevTime = 0;
 
@@ -140,6 +148,7 @@ I2C_AXP192 axp192(I2C_AXP192_DEFAULT_ADDRESS, Wire1);
 
 void IRAM_ATTR timeInterval(){
   spdCurrTime = millis();
+  digitalWrite(LED_PIN, LOW);
 }
 
 int rotX(int cx, int r, int deg) {
@@ -205,6 +214,8 @@ void setup() {
   u8g2.clearBuffer();
 
   pinMode(switch1, INPUT_PULLUP);
+  delay(100);
+  bool isOnline = digitalRead(switch1);
   
   I2C_AXP192_InitDef initDef = {
     .EXTEN  = true,
@@ -246,16 +257,17 @@ void setup() {
 
   // IND_PIN: It is connected to the SIM7600 status Pin,
   // through which you can know whether the module starts normally.
-  pinMode(IND_PIN, INPUT);
+  // pinMode(IND_PIN, INPUT);
 
-  attachInterrupt(IND_PIN, []() {
-    detachInterrupt(IND_PIN);
-    // If SIM7600 starts normally, then set the onboard LED to flash once every 1 second
-    // tick.attach_ms(1000, []() {
-    //   digitalWrite(LED_PIN, !digitalRead(LED_PIN));
-    // });
-  }, CHANGE);
+  // attachInterrupt(IND_PIN, []() {
+  //   detachInterrupt(IND_PIN);
+  //   // If SIM7600 starts normally, then set the onboard LED to flash once every 1 second
+  //   // tick.attach_ms(1000, []() {
+  //   //   digitalWrite(LED_PIN, !digitalRead(LED_PIN));
+  //   // });
+  // }, CHANGE);
 
+  if(isOnline == true){
   SerialMon.println("Wait...");
   u8g2.setFont(u8g2_font_5x7_mr);
   u8g2.setCursor(12,10);
@@ -274,6 +286,7 @@ void setup() {
   SerialMon.println("Initializing modem...");
   if (!modem.init()) {
     SerialMon.println("Failed to restart modem, delaying 10s and retrying");
+    isOnline = false;
     u8g2.setCursor(12,10);
     u8g2.print("Modem init failed  ");
     u8g2.sendBuffer();
@@ -283,32 +296,13 @@ void setup() {
 
   //接続開始
   bool result;
-  do {
-    result = modem.setNetworkMode(38);//2 Automatic, 13 GSM only,  38 LTE only,  51 GSM and LTE only
-    u8g2.setCursor(12,10);
-    u8g2.print("Network: LTE only  ");
-    u8g2.sendBuffer();
-    delay(500);
-  } while (result != true);
-
-  SerialMon.println("Waiting for network...");
-  if (!modem.waitForNetwork()) {
-    delay(10000);
-    SerialMon.println("waitForNetwork");
-    u8g2.setCursor(12,10);
-    u8g2.print("Wait for network   ");
-    u8g2.sendBuffer();
-    return;
+  result = modem.setNetworkMode(38);
+  if (modem.waitResponse(10000L) != 1){
+    SerialMon.println("setNetworkMode fail");
   }
 
-  if (modem.isNetworkConnected()) {
-    SerialMon.println("Network connected");
-    u8g2.setCursor(12,10);
-    u8g2.print("Network connected  ");
-    u8g2.sendBuffer();
-  }
   u8g2.setFont(u8g2_font_open_iconic_www_1x_t);
-  if(isNetworkConnected){
+  if(modem.isNetworkConnected()){
     u8g2.drawGlyph(2,10,0x0051); //Connected
   }else{
     u8g2.drawGlyph(2,10,0x0048); //Disconnected
@@ -352,13 +346,13 @@ void setup() {
   u8g2.sendBuffer();
 
   //GPS enable
-  modem.enableGPS();
+  //modem.enableGPS();
 
-  delay(2000);
-
+  //delay(2000);
+  }
   //Hall sensor interrupt setting
-  pinMode(32, INPUT);
-  attachInterrupt(32, timeInterval, RISING);
+  pinMode(sensor, INPUT);
+  attachInterrupt(sensor, timeInterval, RISING);
 
 }
 
@@ -375,6 +369,8 @@ void loop() {
         if(wheelSpeed >= 100){
           wheelSpeed = 99;
         }
+      }else{
+        wheelSpeed = 0;
       }
       spdPrevTime = spdCurrTime;
 
@@ -420,6 +416,9 @@ void loop() {
       sprintf(timeTextbuf, "%02d:%02d", timeMinhold, (timeSechold)%60);
 
       // Serial.printf("%d:%d\n", timeMinhold, (timeSechold)%60);
+      digitalWrite(LED_PIN, HIGH);
+      // sensorState = digitalRead(sensor);
+      // Serial.printf("%d\n", sensorState);
 
       drawMeter(WheelAvg);
       dtostrf(WheelAvg, 2, 0, spdTexbuf);
@@ -439,7 +438,7 @@ void loop() {
       u8g2.print(batCapacity, 0);
 
       u8g2.setFont(u8g2_font_open_iconic_www_1x_t);
-      if(isNetworkConnected){
+      if(modem.isNetworkConnected()){
         u8g2.drawGlyph(2,10,0x0051); //Connected
       }else{
         u8g2.drawGlyph(2,10,0x0048); //Disconnected
@@ -489,44 +488,46 @@ void loop() {
 
   gpsCurrTime = millis();
   if((gpsCurrTime - gpsPrevTime) >= gpsInterval){
-    // if(modem.getGPS(&lat, &lon)){
-    //   Serial.printf("Lat:%f lon:%f\n", lat, lon);
-    //   tick.attach_ms(200, []() {
-    //           digitalWrite(LED_PIN, !digitalRead(LED_PIN));
-    //   });
-    // }else{
-    //   Serial.printf("GPS no data\n");
-    // }
+    if(modem.isNetworkConnected()){
+      // if(modem.getGPS(&lat, &lon)){
+      //   Serial.printf("Lat:%f lon:%f\n", lat, lon);
+      //   tick.attach_ms(200, []() {
+      //           digitalWrite(LED_PIN, !digitalRead(LED_PIN));
+      //   });
+      // }else{
+      //   Serial.printf("GPS no data\n");
+      // }
 
-    // Serial.printf("Switch1 (23pin):%d\n", digitalRead(23));
+      // Serial.printf("Switch1 (23pin):%d\n", digitalRead(23));
 
-    HttpClient    http = HttpClient(client, serverAddress, port);
+      HttpClient    http = HttpClient(client, serverAddress, port);
 
-    // Serial.println(timeTextbuf);
+      // Serial.println(timeTextbuf);
 
-    //http.connectionKeepAlive();
-    // dataPayload = "/dweet/for/possibility-realize-galaxy?Time="+String(timeTextbuf)
-    //                                                       // "&Latitude="+String(lat)+
-    //                                                       // "&Longtitude="+String(lon)+
-    //                                                       // "&Time(Sec)="+String((int)timeSechold)+
-    //                                                       +"&Speed="+String((int)WheelAvg)
-    //                                                       +"&Battery="+String(batCapacity)
-    //                                                       ;
+      //http.connectionKeepAlive();
+      // dataPayload = "/dweet/for/possibility-realize-galaxy?Time="+String(timeTextbuf)
+      //                                                       // "&Latitude="+String(lat)+
+      //                                                       // "&Longtitude="+String(lon)+
+      //                                                       // "&Time(Sec)="+String((int)timeSechold)+
+      //                                                       +"&Speed="+String((int)WheelAvg)
+      //                                                       +"&Battery="+String(batCapacity)
+      //                                                       ;
 
-    int err = http.get(dataPayload);
+      int err = http.get(dataPayload);
 
-    // int err = http.get("/dweet/for/possibility-realize-galaxy?Speed="+String((int)WheelAvg)+
-    //                                                       // "&Latitude="+String(lat)+
-    //                                                       // "&Longtitude="+String(lon)+
-    //                                                       // "&Time(Sec)="+String((int)timeSechold)+
-    //                                                       "&Time="+String(minTextbuf)+":"+String(secTextbuf)+
-    //                                                       "&Battery="+String(batCapacity)
-    //                                                       );
- 
-    isDatabaseUploaded = true;
-    if (err != 0) {
-      SerialMon.println("failed to connect");
-      isDatabaseUploaded = false;
+      // int err = http.get("/dweet/for/possibility-realize-galaxy?Speed="+String((int)WheelAvg)+
+      //                                                       // "&Latitude="+String(lat)+
+      //                                                       // "&Longtitude="+String(lon)+
+      //                                                       // "&Time(Sec)="+String((int)timeSechold)+
+      //                                                       "&Time="+String(minTextbuf)+":"+String(secTextbuf)+
+      //                                                       "&Battery="+String(batCapacity)
+      //                                                       );
+  
+      isDatabaseUploaded = true;
+      if (err != 0) {
+        SerialMon.println("failed to connect");
+        isDatabaseUploaded = false;
+      }
     }
     gpsPrevTime = gpsCurrTime;
   }
