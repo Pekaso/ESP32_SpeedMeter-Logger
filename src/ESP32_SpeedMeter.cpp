@@ -94,7 +94,7 @@ const float spdMin = 0.0f;
 const int zeroDet = 3;
 int zeroCnt = 0;
 
-unsigned long spdCurrTime = 0;
+volatile unsigned long spdCurrTime = 0;
 unsigned long spdPrevTime = 0;
 unsigned long spdDiffTime = 0;
 float wheelSpeed = 0.0f;
@@ -302,7 +302,7 @@ void setup() {
   }
 
   u8g2.setFont(u8g2_font_open_iconic_www_1x_t);
-  if(modem.isNetworkConnected()){
+  if(isOnline){
     u8g2.drawGlyph(2,10,0x0051); //Connected
   }else{
     u8g2.drawGlyph(2,10,0x0048); //Disconnected
