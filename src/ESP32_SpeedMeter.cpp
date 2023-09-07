@@ -5,7 +5,7 @@
 
 #define TINY_GSM_DEBUG SerialMon //for serial console
 
-#define sample 20
+#define sample 30
 
 #define switch1 23
 #define switch2 19
@@ -30,6 +30,56 @@ TinyGsm modem(SerialAT);
 
 Ticker tick;
 
+// 'donguri', 128x47px
+const unsigned char epd_bitmap_donguri [] PROGMEM = {
+	0xe7, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 
+	0x67, 0x00, 0x8e, 0xff, 0xf8, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xfc, 0xff, 0xff, 0xff, 0xff, 
+	0x67, 0x42, 0x0e, 0x82, 0xf0, 0xff, 0xff, 0xff, 0xff, 0xff, 0x3f, 0xa0, 0xff, 0xff, 0xff, 0xff, 
+	0x47, 0x4a, 0xce, 0xe3, 0xf8, 0xff, 0xff, 0xff, 0xff, 0xff, 0x3f, 0x80, 0xff, 0xff, 0xff, 0xff, 
+	0x01, 0x48, 0x8e, 0xe3, 0xf8, 0xff, 0xff, 0xff, 0xff, 0xff, 0xdf, 0x80, 0xff, 0xff, 0xff, 0xff, 
+	0x63, 0x4a, 0x8e, 0xe3, 0xf8, 0xff, 0xff, 0xff, 0xff, 0xff, 0x8f, 0x81, 0xff, 0xff, 0xff, 0xff, 
+	0x63, 0x4a, 0x8e, 0xe3, 0xf8, 0xff, 0xff, 0xff, 0xff, 0xff, 0x07, 0x03, 0xff, 0xff, 0xff, 0xff, 
+	0x43, 0x48, 0xce, 0xe3, 0xf8, 0xff, 0xff, 0xff, 0xff, 0xff, 0x03, 0x06, 0xff, 0xff, 0xff, 0xff, 
+	0x03, 0x7e, 0x0e, 0x00, 0xf8, 0xff, 0xff, 0xff, 0xff, 0xff, 0x03, 0x0c, 0xff, 0xff, 0xff, 0xff, 
+	0x03, 0x7e, 0xce, 0xe3, 0xf8, 0xff, 0xff, 0xff, 0xff, 0xff, 0x01, 0x18, 0xff, 0xff, 0xff, 0xff, 
+	0x61, 0x7e, 0x8e, 0xe3, 0xf8, 0xff, 0xff, 0xff, 0xff, 0xff, 0x01, 0xb0, 0xff, 0xff, 0xff, 0xff, 
+	0x65, 0x7e, 0x8e, 0xe3, 0xf8, 0xff, 0xff, 0xff, 0xff, 0xff, 0x01, 0xe0, 0xff, 0xff, 0xff, 0xff, 
+	0x66, 0x7e, 0x8e, 0xe3, 0xf8, 0xff, 0xff, 0xff, 0xff, 0xff, 0x01, 0xf3, 0xff, 0xff, 0xff, 0xff, 
+	0x67, 0x7e, 0x8e, 0xe3, 0xf8, 0xff, 0xff, 0xff, 0xff, 0xff, 0xf1, 0xf9, 0xff, 0xff, 0xff, 0xff, 
+	0x67, 0x7e, 0xce, 0xe3, 0xf8, 0xff, 0xff, 0xff, 0xff, 0xff, 0x23, 0xfc, 0xff, 0x1f, 0xf8, 0xff, 
+	0x67, 0x1e, 0x0e, 0x00, 0xf8, 0xff, 0xff, 0xff, 0xff, 0xff, 0x07, 0xfe, 0xff, 0x0f, 0xf0, 0xff, 
+	0x63, 0x3e, 0xce, 0xff, 0xf8, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x0f, 0xe0, 0xff, 
+	0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x07, 0x80, 0xff, 
+	0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x03, 0x01, 0xff, 
+	0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x81, 0x03, 0xf8, 
+	0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xc0, 0x0f, 0xe0, 
+	0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xfe, 0xff, 0xff, 0xff, 0xff, 0x7f, 0xe0, 0x1f, 0x00, 
+	0x87, 0xff, 0xff, 0x1f, 0xfe, 0xff, 0x7f, 0xfc, 0xff, 0xff, 0xff, 0xff, 0x1f, 0xf0, 0x3f, 0x80, 
+	0x83, 0xff, 0xc9, 0x1f, 0xf8, 0xff, 0x3f, 0xfc, 0xff, 0x7f, 0xf0, 0xff, 0x0f, 0xfc, 0xff, 0x80, 
+	0x83, 0xff, 0xc9, 0x1f, 0xfc, 0xff, 0x0f, 0xb8, 0x1c, 0x7e, 0xf0, 0xff, 0x03, 0x1f, 0xe0, 0xc1, 
+	0x87, 0xe7, 0xf9, 0x0f, 0xfc, 0xff, 0x07, 0x9c, 0x1d, 0xfe, 0xf0, 0xff, 0xff, 0x1f, 0xe0, 0xc7, 
+	0x07, 0xc3, 0xff, 0x0f, 0xfe, 0xff, 0x03, 0xbe, 0x1d, 0xfe, 0xf0, 0xff, 0xff, 0x1f, 0xe0, 0xff, 
+	0x07, 0x80, 0xff, 0x07, 0xff, 0xff, 0x01, 0xff, 0x1f, 0xfe, 0xf0, 0xff, 0xff, 0x1f, 0xe0, 0xff, 
+	0x0f, 0x80, 0xff, 0x07, 0xff, 0xff, 0xc0, 0xff, 0x1f, 0xfe, 0xf0, 0xff, 0xff, 0xff, 0xff, 0xff, 
+	0x0f, 0xf0, 0xff, 0x83, 0xff, 0x7f, 0xe0, 0xff, 0x3f, 0xfc, 0xf0, 0xff, 0xff, 0xff, 0xff, 0xff, 
+	0x0f, 0xfc, 0xff, 0x83, 0xff, 0x3f, 0xf0, 0xff, 0x3f, 0xf0, 0xf0, 0xff, 0xff, 0x07, 0x00, 0xc0, 
+	0x07, 0xfe, 0xff, 0xc1, 0xff, 0x0f, 0xf8, 0xff, 0x3f, 0xf8, 0xf0, 0xff, 0x0f, 0x00, 0x00, 0xc0, 
+	0x03, 0xff, 0xff, 0xc1, 0xff, 0x0f, 0xe0, 0xff, 0x3f, 0xfc, 0xf0, 0xff, 0x0f, 0x00, 0x00, 0xc0, 
+	0x03, 0xff, 0xff, 0x21, 0xfe, 0x3f, 0xc0, 0xff, 0x7f, 0x7c, 0xf0, 0xff, 0x0f, 0x00, 0x00, 0xc0, 
+	0x83, 0xff, 0xff, 0x00, 0xfc, 0x7f, 0x00, 0xff, 0x7f, 0x7e, 0xf0, 0xe3, 0x0f, 0x00, 0x00, 0xe0, 
+	0x83, 0xff, 0xff, 0x00, 0xf8, 0xfb, 0x00, 0xfe, 0xff, 0x7e, 0x78, 0x00, 0xff, 0x0f, 0xff, 0xff, 
+	0x03, 0xff, 0x7f, 0x00, 0xf0, 0xf9, 0x01, 0xf8, 0xff, 0x7f, 0x38, 0x00, 0xfe, 0x07, 0x8f, 0xff, 
+	0x03, 0xfe, 0x7f, 0x70, 0xe0, 0xf8, 0x07, 0xf0, 0xff, 0x3f, 0x1c, 0x22, 0xfc, 0x07, 0x07, 0xff, 
+	0x03, 0x00, 0x3f, 0xf8, 0x00, 0xfc, 0x0f, 0xf0, 0xff, 0x3f, 0x1c, 0x73, 0xfc, 0x87, 0x0f, 0xff, 
+	0x07, 0x80, 0x3f, 0xfc, 0x01, 0xfc, 0x1f, 0xf8, 0xff, 0x1f, 0x9e, 0xf1, 0xf8, 0x83, 0x0f, 0xfe, 
+	0x07, 0x80, 0x3f, 0xfc, 0x03, 0xfe, 0x3f, 0xfc, 0xff, 0x0f, 0x8f, 0xf9, 0xf8, 0x03, 0x0f, 0xfe, 
+	0x0f, 0x80, 0xff, 0xfe, 0x07, 0xff, 0x7f, 0xfc, 0xff, 0x8f, 0x8f, 0xf8, 0xf8, 0x01, 0x00, 0xfc, 
+	0x3f, 0x80, 0xff, 0xff, 0xff, 0xff, 0xff, 0xfe, 0xff, 0xe7, 0x1f, 0xfc, 0xfc, 0x01, 0x00, 0xfc, 
+	0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x1f, 0x7c, 0xfc, 0x01, 0x00, 0xfe, 
+	0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x1f, 0x7e, 0xfe, 0x1f, 0xf0, 0xff, 
+	0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x3f, 0x3f, 0xff, 0xff, 0xff, 0xff, 
+	0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xdf, 0xff, 0xff, 0xff, 0xff
+};
 
 U8G2_ST7565_ERC12864_F_4W_SW_SPI u8g2(U8G2_R0,/* clock=*/ 33, /* data=*/ 14, /* cs=*/ 15, /* dc=*/ 2, /* reset=*/ 13);
 
@@ -53,6 +103,14 @@ const char gprsPass[] = "iij";
 #define POWER_PIN               25
 #define IND_PIN                 36
 
+int systemState = 0;
+
+bool isOnline = false;
+int networkState = 0;
+unsigned long netInterval = 100;
+unsigned long netCurrTime = 0;
+unsigned long netPrevTime = 0;
+
 bool LED_STATS = false;
 
 //Update display
@@ -61,9 +119,10 @@ unsigned long dispCurrTime = 0;
 unsigned long dispPrevTime = 0;
 
 //Network connection
-bool isNetworkConnected = true;
-bool isDatabaseUploaded = true;
-bool isLoggingStarted = true;
+bool isNetworkConnected = false;
+bool isDatabaseUploaded = false;
+bool isLoggingStarted = false;
+int isUploadingCount = 0;
 
 //Analog Meter
 const int needleWid = 4;
@@ -215,7 +274,7 @@ void setup() {
 
   pinMode(switch1, INPUT_PULLUP);
   delay(100);
-  bool isOnline = digitalRead(switch1);
+  isOnline = digitalRead(switch1);
   
   I2C_AXP192_InitDef initDef = {
     .EXTEN  = true,
@@ -246,110 +305,11 @@ void setup() {
 
   // POWER_PIN : This pin controls the power supply of the SIM7600
   pinMode(POWER_PIN, OUTPUT);
-  digitalWrite(POWER_PIN, HIGH);
 
   // PWR_PIN ： This Pin is the PWR-KEY of the SIM7600
   // The time of active low level impulse of PWRKEY pin to power on module , type 500 ms
   pinMode(PWR_PIN, OUTPUT);
-  digitalWrite(PWR_PIN, HIGH);
-  delay(500);
-  digitalWrite(PWR_PIN, LOW);
 
-  // IND_PIN: It is connected to the SIM7600 status Pin,
-  // through which you can know whether the module starts normally.
-  // pinMode(IND_PIN, INPUT);
-
-  // attachInterrupt(IND_PIN, []() {
-  //   detachInterrupt(IND_PIN);
-  //   // If SIM7600 starts normally, then set the onboard LED to flash once every 1 second
-  //   // tick.attach_ms(1000, []() {
-  //   //   digitalWrite(LED_PIN, !digitalRead(LED_PIN));
-  //   // });
-  // }, CHANGE);
-
-  if(isOnline == true){
-  SerialMon.println("Wait...");
-  u8g2.setFont(u8g2_font_5x7_mr);
-  u8g2.setCursor(12,10);
-  u8g2.print("Wait...              ");
-  u8g2.sendBuffer();
-
-  delay(3000);
-
-  SerialAT.begin(UART_BAUD, SERIAL_8N1, PIN_RX, PIN_TX);
-
-  //モデムの初期化
-  u8g2.setCursor(12,10);
-  u8g2.print("Initializing modem...");
-  u8g2.sendBuffer();
-
-  SerialMon.println("Initializing modem...");
-  if (!modem.init()) {
-    SerialMon.println("Failed to restart modem, delaying 10s and retrying");
-    isOnline = false;
-    u8g2.setCursor(12,10);
-    u8g2.print("Modem init failed  ");
-    u8g2.sendBuffer();
-    return;
-  }
-  SerialMon.println("enter setNetwork Mode");
-
-  //接続開始
-  bool result;
-  result = modem.setNetworkMode(38);
-  if (modem.waitResponse(10000L) != 1){
-    SerialMon.println("setNetworkMode fail");
-  }
-
-  u8g2.setFont(u8g2_font_open_iconic_www_1x_t);
-  if(isOnline){
-    u8g2.drawGlyph(2,10,0x0051); //Connected
-  }else{
-    u8g2.drawGlyph(2,10,0x0048); //Disconnected
-  }
-  u8g2.sendBuffer();
-
-  SerialMon.print("Connecting to:");
-  SerialMon.println(apn);
-  if (!modem.gprsConnect(apn, gprsUser, gprsPass)) {
-    delay(10000);
-    return;
-  }
-
-  bool res = modem.isGprsConnected();
-  SerialMon.print("GPRS status:");
-  SerialMon.println(res);
-
-  IPAddress local = modem.localIP();
-  SerialMon.print("Local IP:");
-  SerialMon.println(local);
-
-  int csq = modem.getSignalQuality();
-  SerialMon.print("Signal quality:");
-  SerialMon.println(csq);
-
-  u8g2.setFont(u8g2_font_5x7_mr);
-
-  u8g2.setCursor(12,20);
-  u8g2.print("Connecting to:  ");
-  u8g2.print(apn);
-
-  u8g2.setCursor(12,28);
-  u8g2.print("Local IP:");
-  u8g2.setCursor(20,36);
-  u8g2.print(local);
-
-  u8g2.setCursor(12,44);
-  u8g2.print("Signal quality:");
-  u8g2.print(csq);
-
-  u8g2.sendBuffer();
-
-  //GPS enable
-  //modem.enableGPS();
-
-  //delay(2000);
-  }
   //Hall sensor interrupt setting
   pinMode(sensor, INPUT);
   attachInterrupt(sensor, timeInterval, RISING);
@@ -359,10 +319,163 @@ void setup() {
 void loop() {
   // put your main code here, to run repeated
   dispCurrTime = millis();
+  netCurrTime = millis();
+  battCurrTime = millis();
+
+  // Network Control
+  // 0 pin config
+  // 1 PWR-KEY control for SIM7600 (500ms)
+  // 2 IND_PIN control
+  // 3 wait 3000ms and SerialAT begin
+  // 4 modem init
+  // 5 modem setNetworkMode
+  // 6 gprsConnect
+  // 7 wait 10000ms
+  // 8 normal
+  // 9 error
+
+  if(isOnline){
+    switch(networkState){
+      case 0:
+        // POWER_PIN : This pin controls the power supply of the SIM7600
+        digitalWrite(POWER_PIN, HIGH); 
+        networkState = 1;
+        SerialMon.println("networkState 0 -> 1");
+        netInterval = 500;
+        netPrevTime = millis();
+        digitalWrite(PWR_PIN, HIGH);
+        break;
+      case 1:
+        if((netCurrTime - netPrevTime) >= netInterval){
+          digitalWrite(PWR_PIN, LOW);
+          networkState = 2;
+          SerialMon.println("networkState 1 -> 2");
+        }
+        break;
+      case 2:
+        // IND_PIN: It is connected to the SIM7600 status Pin,
+        // through which you can know whether the module starts normally.
+        // pinMode(IND_PIN, INPUT);
+
+        // attachInterrupt(IND_PIN, []() {
+        //   detachInterrupt(IND_PIN);
+        //   // If SIM7600 starts normally, then set the onboard LED to flash once every 1 second
+        //   // tick.attach_ms(1000, []() {
+        //   //   digitalWrite(LED_PIN, !digitalRead(LED_PIN));
+        //   // });
+        // }, CHANGE);
+        netInterval = 3000;
+        netPrevTime = millis();
+        networkState = 3;
+        SerialMon.println("networkState 2 -> 3");
+        break;
+      case 3:
+        if((netCurrTime - netPrevTime) >= netInterval){
+          SerialMon.println("Wait...");
+          SerialAT.begin(UART_BAUD, SERIAL_8N1, PIN_RX, PIN_TX);
+          networkState = 4;
+          SerialMon.println("networkState 3 -> 4");
+        }
+        break;
+      case 4:
+        SerialMon.println("Initializing modem...");
+        if (!modem.init()) {
+          SerialMon.println("Failed to restart modem, delaying 10s and retrying");
+          //isOnline = false;
+          //return;
+        }
+        SerialMon.println("enter setNetwork Mode");
+        networkState = 5;
+        SerialMon.println("networkState 4 -> 5");
+        break;
+      case 5:
+        bool result;
+        result = modem.setNetworkMode(38);
+        if (modem.waitResponse(10000L) != 1){
+          SerialMon.println("setNetworkMode fail");
+        }
+        networkState = 6;
+        SerialMon.println("networkState 5 -> 6");
+        break;
+      case 6:
+        SerialMon.print("Connecting to:");
+        SerialMon.println(apn);
+        modem.gprsConnect(apn, gprsUser, gprsPass);
+        netInterval = 10000;
+        netPrevTime = millis();
+        networkState = 7;
+        SerialMon.println("networkState 6 -> 7");
+        // if (!modem.gprsConnect(apn, gprsUser, gprsPass)) {
+        //   netInterval = 10000;
+        //   netPrevTime = millis();
+        //   networkState = 7;
+        //   SerialMon.println("networkState 6 -> 7");
+        //   //return;
+        // }
+        break;
+      case 7:
+        if((netCurrTime - netPrevTime) >= netInterval){
+            bool res = modem.isGprsConnected();
+            SerialMon.print("GPRS status:");
+            SerialMon.println(res);
+
+            IPAddress local = modem.localIP();
+            SerialMon.print("Local IP:");
+            SerialMon.println(local);
+
+            int csq = modem.getSignalQuality();
+            SerialMon.print("Signal quality:");
+            SerialMon.println(csq);
+
+          netInterval = 2000;
+          netPrevTime = millis();
+          networkState = 8;
+          SerialMon.println("networkState 7 -> 8");
+          if(modem.isNetworkConnected()){
+            SerialMon.println("Network Initialized");
+            isNetworkConnected = true;
+          }else{
+            digitalWrite(POWER_PIN, LOW);
+            digitalWrite(PWR_PIN, HIGH);
+            SerialMon.println("Offline mode");
+            isNetworkConnected = false;
+            isOnline = false;
+          }
+        }
+        break;
+      case 8:
+        if((netCurrTime - netPrevTime) >= netInterval){
+          dataPayload = "/dweet/for/possibility-realize-galaxy?Time="+String(timeTextbuf)
+                                                      // "&Latitude="+String(lat)+
+                                                      // "&Longtitude="+String(lon)+
+                                                      // "&Time(Sec)="+String((int)timeSechold)+
+                                                      +"&Speed="+String((int)WheelAvg)
+                                                      +"&Battery="+String(batCapacity)
+                                                      ;
+          HttpClient    http = HttpClient(client, serverAddress, port);
+          int err = http.get(dataPayload);
+          isDatabaseUploaded = true;
+          if (err != 0) {
+            SerialMon.println("failed to connect");
+            isDatabaseUploaded = false;
+          }
+          netInterval = 2000;
+          netPrevTime = millis();
+          networkState = 8;
+        }
+        //networkState = 9;
+        break;
+      case 9:
+        networkState = 9;
+        break;
+      default:
+      break;
+    }
+  }
+
   if((dispCurrTime - dispPrevTime) >= dispInterval){
     u8g2.firstPage();
     do {
-    
       spdDiffTime = spdCurrTime - spdPrevTime;
       if(spdDiffTime > 0){        
         wheelSpeed = (0.55 * 3.14 * 3.6 * 1000) / (spdDiffTime);
@@ -374,15 +487,6 @@ void loop() {
       }
       spdPrevTime = spdCurrTime;
 
-      // if(wheelSpeed <= 4){
-      //   zeroCnt++;
-      //   if(zeroCnt >= zeroDet){
-      //     wheelSpeed = 0;
-      //   }
-      // }else{
-      //   zeroCnt = 0;
-      // }
-
       for(int i = sample - 1; i > 0; i--){
         spdAvg[i] = spdAvg[i-1];
       }
@@ -392,10 +496,6 @@ void loop() {
         WheelAvg += spdAvg[i];
       }
       WheelAvg = (float)WheelAvg/sample;
-
-      // if(WheelAvg >= 1){
-      //   WheelAvg -= WheelAvg - 1;
-      // }
 
       if(digitalRead(switch1) == 0){
         if(isTimerStart){
@@ -415,10 +515,7 @@ void loop() {
 
       sprintf(timeTextbuf, "%02d:%02d", timeMinhold, (timeSechold)%60);
 
-      // Serial.printf("%d:%d\n", timeMinhold, (timeSechold)%60);
       digitalWrite(LED_PIN, HIGH);
-      // sensorState = digitalRead(sensor);
-      // Serial.printf("%d\n", sensorState);
 
       drawMeter(WheelAvg);
       dtostrf(WheelAvg, 2, 0, spdTexbuf);
@@ -438,16 +535,19 @@ void loop() {
       u8g2.print(batCapacity, 0);
 
       u8g2.setFont(u8g2_font_open_iconic_www_1x_t);
-      if(modem.isNetworkConnected()){
+      if(isNetworkConnected){
         u8g2.drawGlyph(2,10,0x0051); //Connected
       }else{
-        u8g2.drawGlyph(2,10,0x0048); //Disconnected
+        u8g2.drawGlyph(2,10,0x0054); //Disconnected
       }
 
       if(isDatabaseUploaded){
         u8g2.drawGlyph(12,10,0x0043); //Uploaded
-      }else{
-        u8g2.drawGlyph(12,10,0x0054); //Not Uploaded
+        isUploadingCount++;
+        if(isUploadingCount >= 10){
+          isDatabaseUploaded = false;
+          isUploadingCount = 0;
+        }
       }
 
       u8g2.setFont(u8g2_font_open_iconic_play_1x_t);
@@ -456,27 +556,26 @@ void loop() {
       }else{
         u8g2.drawGlyph(42, 61,0x0044); //paused
       }
+
+      if(isOnline && (networkState <= 4)){
+        u8g2.clearBuffer();
+        u8g2.setBitmapMode(false /* solid */);
+        u8g2.setDrawColor(0);
+        u8g2.drawXBM( 0, 0, 128, 47, epd_bitmap_donguri);
+        u8g2.setDrawColor(1);
+        u8g2.setFont(u8g2_font_samim_12_t_all);
+        u8g2.setCursor(30,60);
+        u8g2.print("Initializing...");
+      }
       
       } while ( u8g2.nextPage() );
-
-      dataPayload = "/dweet/for/possibility-realize-galaxy?Time="+String(timeTextbuf)
-                                                      // "&Latitude="+String(lat)+
-                                                      // "&Longtitude="+String(lon)+
-                                                      // "&Time(Sec)="+String((int)timeSechold)+
-                                                      +"&Speed="+String((int)WheelAvg)
-                                                      +"&Battery="+String(batCapacity)
-                                                      ;
-
 
       dispPrevTime = dispCurrTime;
   }
 
-  battCurrTime = millis();
-  if((battCurrTime - battPrevTime) >= battInterval){
-    noInterrupts();
+  if(((battCurrTime - battPrevTime) >= battInterval)){
     batVoltage = axp192.getBatteryVoltage();
     batVbusVol = axp192.getVbusVoltage();
-    interrupts();
     if(batVbusVol >= 200){
       battIsCharge = true;
     }else{
@@ -486,50 +585,50 @@ void loop() {
     battPrevTime = battCurrTime;
   }
 
-  gpsCurrTime = millis();
-  if((gpsCurrTime - gpsPrevTime) >= gpsInterval){
-    if(modem.isNetworkConnected()){
-      // if(modem.getGPS(&lat, &lon)){
-      //   Serial.printf("Lat:%f lon:%f\n", lat, lon);
-      //   tick.attach_ms(200, []() {
-      //           digitalWrite(LED_PIN, !digitalRead(LED_PIN));
-      //   });
-      // }else{
-      //   Serial.printf("GPS no data\n");
-      // }
+  // gpsCurrTime = millis();
+  // if((gpsCurrTime - gpsPrevTime) >= gpsInterval){
+  //   if(modem.isNetworkConnected()){
+  //     // if(modem.getGPS(&lat, &lon)){
+  //     //   Serial.printf("Lat:%f lon:%f\n", lat, lon);
+  //     //   tick.attach_ms(200, []() {
+  //     //           digitalWrite(LED_PIN, !digitalRead(LED_PIN));
+  //     //   });
+  //     // }else{
+  //     //   Serial.printf("GPS no data\n");
+  //     // }
 
-      // Serial.printf("Switch1 (23pin):%d\n", digitalRead(23));
+  //     // Serial.printf("Switch1 (23pin):%d\n", digitalRead(23));
 
-      HttpClient    http = HttpClient(client, serverAddress, port);
+  //     HttpClient    http = HttpClient(client, serverAddress, port);
 
-      // Serial.println(timeTextbuf);
+  //     // Serial.println(timeTextbuf);
 
-      //http.connectionKeepAlive();
-      // dataPayload = "/dweet/for/possibility-realize-galaxy?Time="+String(timeTextbuf)
-      //                                                       // "&Latitude="+String(lat)+
-      //                                                       // "&Longtitude="+String(lon)+
-      //                                                       // "&Time(Sec)="+String((int)timeSechold)+
-      //                                                       +"&Speed="+String((int)WheelAvg)
-      //                                                       +"&Battery="+String(batCapacity)
-      //                                                       ;
+  //     //http.connectionKeepAlive();
+  //     // dataPayload = "/dweet/for/possibility-realize-galaxy?Time="+String(timeTextbuf)
+  //     //                                                       // "&Latitude="+String(lat)+
+  //     //                                                       // "&Longtitude="+String(lon)+
+  //     //                                                       // "&Time(Sec)="+String((int)timeSechold)+
+  //     //                                                       +"&Speed="+String((int)WheelAvg)
+  //     //                                                       +"&Battery="+String(batCapacity)
+  //     //                                                       ;
 
-      int err = http.get(dataPayload);
+  //     int err = http.get(dataPayload);
 
-      // int err = http.get("/dweet/for/possibility-realize-galaxy?Speed="+String((int)WheelAvg)+
-      //                                                       // "&Latitude="+String(lat)+
-      //                                                       // "&Longtitude="+String(lon)+
-      //                                                       // "&Time(Sec)="+String((int)timeSechold)+
-      //                                                       "&Time="+String(minTextbuf)+":"+String(secTextbuf)+
-      //                                                       "&Battery="+String(batCapacity)
-      //                                                       );
+  //     // int err = http.get("/dweet/for/possibility-realize-galaxy?Speed="+String((int)WheelAvg)+
+  //     //                                                       // "&Latitude="+String(lat)+
+  //     //                                                       // "&Longtitude="+String(lon)+
+  //     //                                                       // "&Time(Sec)="+String((int)timeSechold)+
+  //     //                                                       "&Time="+String(minTextbuf)+":"+String(secTextbuf)+
+  //     //                                                       "&Battery="+String(batCapacity)
+  //     //                                                       );
   
-      isDatabaseUploaded = true;
-      if (err != 0) {
-        SerialMon.println("failed to connect");
-        isDatabaseUploaded = false;
-      }
-    }
-    gpsPrevTime = gpsCurrTime;
-  }
+  //     isDatabaseUploaded = true;
+  //     if (err != 0) {
+  //       SerialMon.println("failed to connect");
+  //       isDatabaseUploaded = false;
+  //     }
+  //   }
+  //   gpsPrevTime = gpsCurrTime;
+  // }
 
 }
