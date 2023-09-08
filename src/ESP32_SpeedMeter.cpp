@@ -170,7 +170,19 @@ int timeElapsed = 0;
 int timeMinhold = 0;
 int timeSechold = 0;
 
-char timeTextbuf[5];
+volatile bool lapPushed = false;
+int lapCount = 0;
+
+char timeTextbuf[10][6] = {"00:00",
+                          "00:00",
+                          "00:00",
+                          "00:00",
+                          "00:00",
+                          "00:00",
+                          "00:00",
+                          "00:00",
+                          "00:00",
+                          "00:00"};
 
 //GPS data
 float lat       = 0;
@@ -208,6 +220,10 @@ I2C_AXP192 axp192(I2C_AXP192_DEFAULT_ADDRESS, Wire1);
 void IRAM_ATTR timeInterval(){
   spdCurrTime = millis();
   digitalWrite(LED_PIN, LOW);
+}
+
+void IRAM_ATTR laptimequery(){
+  lapPushed = true;
 }
 
 int rotX(int cx, int r, int deg) {
@@ -313,6 +329,9 @@ void setup() {
   //Hall sensor interrupt setting
   pinMode(sensor, INPUT);
   attachInterrupt(sensor, timeInterval, RISING);
+
+  // pinMode(switch2, INPUT_PULLUP);
+  // attachInterrupt(switch2, laptimequery, FALLING);
 
 }
 
@@ -445,7 +464,7 @@ void loop() {
         break;
       case 8:
         if((netCurrTime - netPrevTime) >= netInterval){
-          dataPayload = "/dweet/for/possibility-realize-galaxy?Time="+String(timeTextbuf)
+          dataPayload = "/dweet/for/possibility-realize-galaxy?Time="+String(timeTextbuf[0])
                                                       // "&Latitude="+String(lat)+
                                                       // "&Longtitude="+String(lon)+
                                                       // "&Time(Sec)="+String((int)timeSechold)+
@@ -505,7 +524,7 @@ void loop() {
         }else{
           isTimerStart = true;
           timeElapsed = 0;
-          timeMinhold = 0;
+          timeSechold = 0;
           timeMinhold = 0;
           timeInihold = millis();
         }
@@ -513,7 +532,25 @@ void loop() {
         isTimerStart = false;
       }
 
-      sprintf(timeTextbuf, "%02d:%02d", timeMinhold, (timeSechold)%60);
+      // if(lapPushed){
+      //   lapPushed = false;
+      //   for(int j = 10 - 1; j > 0; j--){
+      //     strcpy(timeTextbuf[j], timeTextbuf[j-1]);
+      //     //timeTextbuf[j] = timeTextbuf[j-1];
+      //   }
+
+      //   timeElapsed = 0;
+      //   timeMinhold = 0;
+      //   timeMinhold = 0;
+      //   timeInihold = millis();
+      //   for(int k = 0; k < 10; k++){
+      //     SerialMon.print(k);
+      //     SerialMon.print(":, ");
+      //     SerialMon.println(timeTextbuf[k]);
+      //   }
+      // }
+
+      sprintf(timeTextbuf[0], "%02d:%02d", timeMinhold, (timeSechold)%60);
 
       digitalWrite(LED_PIN, HIGH);
 
@@ -527,7 +564,7 @@ void loop() {
       u8g2.print("km/h");
 
       u8g2.setFont(u8g2_font_mercutio_sc_nbp_tn);
-      u8g2.drawStr(56, 62, timeTextbuf);
+      u8g2.drawStr(56, 62, timeTextbuf[0]);
 
       drawBattery(119, 22, battIsCharge, batCapacity);
       u8g2.setFont(u8g2_font_5x7_mr);
@@ -566,6 +603,18 @@ void loop() {
         u8g2.setFont(u8g2_font_samim_12_t_all);
         u8g2.setCursor(30,60);
         u8g2.print("Initializing...");
+      }
+
+      if(axp192.getPekPress() == 1){
+        SerialMon.println("Shutdown...");
+        digitalWrite(POWER_PIN, LOW);
+        digitalWrite(PWR_PIN, HIGH);
+        u8g2.clearBuffer();
+        u8g2.setCursor(40,30);
+        u8g2.print("Shutdown...");
+        u8g2.sendBuffer();
+        delay(500);
+        axp192.powerOff();
       }
       
       } while ( u8g2.nextPage() );
