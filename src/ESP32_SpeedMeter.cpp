@@ -162,7 +162,8 @@ unsigned long gpsCurrTime = 0;
 unsigned long gpsPrevTime = 0;
 
 //Http Client
-const char serverAddress[] = "dweet.io";  // server address
+//const char serverAddress[] = "dweet.io";  // server address
+const char serverAddress[] = "dweet.cc";  // server address
 const int port = 80;
 
 String dweetName = "possibility-realize-galaxy";
