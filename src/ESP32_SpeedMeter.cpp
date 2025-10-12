@@ -239,8 +239,9 @@ void drawBattery(int x, int y, bool isCharge, int percent){
   }
 }
 
-// --- Refactored task functions ---
-static void updateNetwork() {
+// networkStep
+// - Drives SIM7600 initialization and connection state machine (no data send).
+static void networkStep() {
   if(!isOnline) return;
   switch(networkState){
     case 0:
@@ -330,91 +331,107 @@ static void updateNetwork() {
       }
       break;
     case 8:
-      if((netCurrTime - netPrevTime) >= netInterval){
-        dataPayload = "/dweet/for/possibility-realize-galaxy?Time="+String(timeTextbuf[0])
-                        +"&Speed="+String((int)WheelAvg)
-                        +"&Battery="+String(batCapacity);
-        HttpClient http = HttpClient(client, serverAddress, port);
-        int err = http.get(dataPayload);
-        isDatabaseUploaded = true;
-        if (err != 0) {
-          SerialMon.println("failed to connect");
-          isDatabaseUploaded = false;
-        }
-        netInterval = 2000;
-        netPrevTime = millis();
-        networkState = 8;
-      }
+      // Connected; data publish handled by networkPublish()
       break;
     case 9:
-      networkState = 9;
+      // Error state (not used)
       break;
     default:
       break;
   }
 }
 
-static void updateDisplay() {
-  if((dispCurrTime - dispPrevTime) < dispInterval) return;
+// networkPublish
+// - Sends telemetry to dweet.io when connected and interval elapsed.
+static void networkPublish() {
+  if(!isOnline || networkState != 8) return;
+  if((netCurrTime - netPrevTime) < netInterval) return;
 
+  dataPayload = "/dweet/for/possibility-realize-galaxy?Time="+String(timeTextbuf[0])
+                +"&Speed="+String((int)WheelAvg)
+                +"&Battery="+String(batCapacity);
+  HttpClient http = HttpClient(client, serverAddress, port);
+  int err = http.get(dataPayload);
+  isDatabaseUploaded = true;
+  if (err != 0) {
+    SerialMon.println("failed to connect");
+    isDatabaseUploaded = false;
+  }
+  netInterval = 2000;
+  netPrevTime = millis();
+}
+
+// readButtonsAndTimer
+// - Reads start/pause button and updates stopwatch values and formatted text.
+static void readButtonsAndTimer(unsigned long now) {
+  if(digitalRead(switch1) == 0){
+    if(isTimerStart){
+      timeElapsed = now - timeInihold;
+      timeSechold = timeElapsed / 1000;
+      timeMinhold = timeSechold / 60;
+    }else{
+      isTimerStart = true;
+      timeElapsed = 0;
+      timeSechold = 0;
+      timeMinhold = 0;
+      timeInihold = now;
+    }
+  }else{
+    isTimerStart = false;
+  }
+  sprintf(timeTextbuf[0], "%02d:%02d", timeMinhold, (timeSechold)%60);
+}
+
+// computeSpeedAndAverage
+// - Converts pulse intervals to speed (km/h), applies optional low-speed smoothing,
+//   maintains moving average buffer and updates WheelAvg.
+static void computeSpeedAndAverage() {
   static float lastInstantSpeed = 0.0f; // km/h
+
+  spdDiffTime = spdCurrTime - spdPrevTime;
+  if(spdDiffTime > 0){
+    wheelSpeed = (0.55 * 3.14 * 3.6 * 1000) / (spdDiffTime);
+    if(wheelSpeed >= 100){ wheelSpeed = 99; }
+    lastInstantSpeed = wheelSpeed;
+  }else{
+#if ENABLE_LOW_SPEED_SMOOTHING
+    unsigned long sincePulse = dispCurrTime - spdPrevTime;
+    if(lastInstantSpeed <= LOW_SPEED_THRESHOLD_KMH){
+      if(sincePulse <= SMOOTH_DECAY_DELAY_MS){
+        wheelSpeed = lastInstantSpeed;
+      }else{
+        float t = (float)(sincePulse - SMOOTH_DECAY_DELAY_MS) / (float)SMOOTH_DECAY_TIME_MS;
+        if(t > 1.0f) t = 1.0f;
+        wheelSpeed = lastInstantSpeed * (1.0f - t);
+      }
+    }else{
+      wheelSpeed = 0;
+    }
+#else
+    wheelSpeed = 0;
+#endif
+  }
+  spdPrevTime = spdCurrTime;
+
+  for(int i = sample - 1; i > 0; i--){
+    spdAvg[i] = spdAvg[i-1];
+  }
+  spdAvg[0] = wheelSpeed;
+
+  WheelAvg = 0.0f;
+  for(int i = 0; i < sample; i++){
+    WheelAvg += spdAvg[i];
+  }
+  WheelAvg = (float)WheelAvg / sample;
+}
+
+// renderUI
+// - Renders meter, texts, icons, and initialization overlay.
+static void renderUI() {
+  if((dispCurrTime - dispPrevTime) < dispInterval) return;
 
   u8g2.firstPage();
   do {
-    spdDiffTime = spdCurrTime - spdPrevTime;
-    if(spdDiffTime > 0){
-      wheelSpeed = (0.55 * 3.14 * 3.6 * 1000) / (spdDiffTime);
-      if(wheelSpeed >= 100){ wheelSpeed = 99; }
-      lastInstantSpeed = wheelSpeed;
-    }else{
-#if ENABLE_LOW_SPEED_SMOOTHING
-      unsigned long sincePulse = dispCurrTime - spdPrevTime;
-      if(lastInstantSpeed <= LOW_SPEED_THRESHOLD_KMH){
-        if(sincePulse <= SMOOTH_DECAY_DELAY_MS){
-          wheelSpeed = lastInstantSpeed;
-        }else{
-          float t = (float)(sincePulse - SMOOTH_DECAY_DELAY_MS) / (float)SMOOTH_DECAY_TIME_MS;
-          if(t > 1.0f) t = 1.0f;
-          wheelSpeed = lastInstantSpeed * (1.0f - t);
-        }
-      }else{
-        wheelSpeed = 0; // high speed path keeps original behavior when no new pulse
-      }
-#else
-      wheelSpeed = 0;
-#endif
-    }
-    spdPrevTime = spdCurrTime;
-
-    for(int i = sample - 1; i > 0; i--){
-      spdAvg[i] = spdAvg[i-1];
-    }
-    spdAvg[0] = wheelSpeed;
-
-    WheelAvg = 0.0f;
-    for(int i = 0; i < sample; i++){
-      WheelAvg += spdAvg[i];
-    }
-    WheelAvg = (float)WheelAvg/sample;
-
-    if(digitalRead(switch1) == 0){
-      if(isTimerStart){
-        timeElapsed = millis() - timeInihold;
-        timeSechold = timeElapsed / 1000;
-        timeMinhold = timeSechold / 60;
-      }else{
-        isTimerStart = true;
-        timeElapsed = 0;
-        timeSechold = 0;
-        timeMinhold = 0;
-        timeInihold = millis();
-      }
-    }else{
-      isTimerStart = false;
-    }
-
-    sprintf(timeTextbuf[0], "%02d:%02d", timeMinhold, (timeSechold)%60);
-
     digitalWrite(LED_PIN, HIGH);
 
     drawMeter(WheelAvg);
@@ -485,6 +502,8 @@ static void updateDisplay() {
   dispPrevTime = dispCurrTime;
 }
 
+// updateBatteryStatus
+// - Periodically samples battery voltages and computes percentage and charge state.
 static void updateBatteryStatus() {
   if((battCurrTime - battPrevTime) < battInterval) return;
   batVoltage = axp192.getBatteryVoltage();
@@ -555,9 +574,14 @@ void loop() {
   netCurrTime = now;
   battCurrTime = now;
 
-  updateNetwork();
-
-  updateDisplay();
+  // Inputs & network
+  networkStep();
+  networkPublish();
+  // Inputs processing
+  readButtonsAndTimer(now);
+  computeSpeedAndAverage();
+  // Output rendering
+  renderUI();
 
   updateBatteryStatus();
 
