@@ -1,9 +1,9 @@
-#define TINY_GSM_MODEM_SIM7600 //Use SIM7600JC LTE Module
-#define SerialMon Serial //Default speed 115200 baud
-#define SerialAT Serial1 //for AT commands to the module
-// #define DUMP_AT_COMMANDS //for debug
+// #define TINY_GSM_MODEM_SIM7600 //Use SIM7600JC LTE Module
+// #define SerialMon Serial //Default speed 115200 baud
+// #define SerialAT Serial1 //for AT commands to the module
+// // #define DUMP_AT_COMMANDS //for debug
 
-#define TINY_GSM_DEBUG SerialMon //for serial console
+// #define TINY_GSM_DEBUG SerialMon //for serial console
 
 #define sample 30
 
@@ -16,19 +16,42 @@
 #include <SPI.h>
 #include <U8g2lib.h>
 
-#include <TinyGsmClient.h>
+// #include <TinyGsmClient.h>
 #include <Ticker.h>
-#include <ArduinoHttpClient.h>
+// #include <ArduinoHttpClient.h>
 
-#ifdef DUMP_AT_COMMANDS
-#include <StreamDebugger.h>
-StreamDebugger debugger(SerialAT, SerialMon);
-TinyGsm modem(debugger);
-#else
-TinyGsm modem(SerialAT);
-#endif
+// #ifdef DUMP_AT_COMMANDS
+// #include <StreamDebugger.h>
+// StreamDebugger debugger(SerialAT, SerialMon);
+// TinyGsm modem(debugger);
+// #else
+// TinyGsm modem(SerialAT);
+// #endif
 
 Ticker tick;
+
+#include "esp32_e220900t22s_jp_lib.h"
+
+CLoRa lora;
+LoRaConfigItem_t config;
+
+// ===== Node settings =====
+static const uint16_t PARENT_ADDR = 0x0001;
+static const uint16_t CHILD_ADDR  = 0x0010;
+static const uint8_t  LORA_CH     = 0x00;
+
+// true: broadcast, false: unicast to CHILD_ADDR
+static const bool USE_BROADCAST = false;
+static const uint16_t BROADCAST_ADDR = 0xFFFF;
+
+// ===== Payload settings =====
+static const size_t PAYLOAD_LEN = 29;
+static const uint8_t MAGIC = 0xE2;
+static const uint8_t PROTOCOL_VER = 0x01;
+
+uint32_t seq = 0;
+uint16_t appCounter = 0;
+uint32_t lastSendMs = 0;
 
 // 'donguri', 128x47px
 const unsigned char epd_bitmap_donguri [] PROGMEM = {
@@ -83,25 +106,25 @@ const unsigned char epd_bitmap_donguri [] PROGMEM = {
 
 U8G2_ST7565_ERC12864_F_4W_SW_SPI u8g2(U8G2_R0,/* clock=*/ 33, /* data=*/ 14, /* cs=*/ 15, /* dc=*/ 2, /* reset=*/ 13);
 
-//GSM credentials
-// const char apn[]  = "povo.jp";
-// const char gprsUser[] = "";
-// const char gprsPass[] = "";
-const char apn[]  = "iijmio.jp";
-const char gprsUser[] = "mio@iij";
-const char gprsPass[] = "iij";
+// //GSM credentials
+// // const char apn[]  = "povo.jp";
+// // const char gprsUser[] = "";
+// // const char gprsPass[] = "";
+// const char apn[]  = "iijmio.jp";
+// const char gprsUser[] = "mio@iij";
+// const char gprsPass[] = "iij";
 
 
-//Modem settings
-#define uS_TO_S_FACTOR          1000000ULL  //Conversion factor for micro seconds to seconds 
-//#define TIME_TO_SLEEP           60          //Time ESP32 will go to sleep (in seconds) 
-#define PIN_TX                  27
-#define PIN_RX                  26
-#define UART_BAUD               115200
-#define PWR_PIN                 4
-#define LED_PIN                 12
-#define POWER_PIN               25
-#define IND_PIN                 36
+// //Modem settings
+// #define uS_TO_S_FACTOR          1000000ULL  //Conversion factor for micro seconds to seconds 
+// //#define TIME_TO_SLEEP           60          //Time ESP32 will go to sleep (in seconds) 
+// #define PIN_TX                  27
+// #define PIN_RX                  26
+// #define UART_BAUD               115200
+// #define PWR_PIN                 4
+// #define LED_PIN                 12
+// #define POWER_PIN               25
+// #define IND_PIN                 36
 
 int systemState = 0;
 
@@ -172,42 +195,140 @@ int timeSechold = 0;
 
 char timeTextbuf[5];
 
-//GPS data
-float lat       = 0;
-float lon       = 0;
-float speed     = 0;
-float alt       = 0;
-int   vsat      = 0;
-int   usat      = 0;
-float accuracy  = 0;
-int   year      = 0;
-int   month     = 0;
-int   day       = 0;
-int   hour      = 0;
-int   minute    = 0;
-int   second    = 0;
+// //GPS data
+// float lat       = 0;
+// float lon       = 0;
+// float speed     = 0;
+// float alt       = 0;
+// int   vsat      = 0;
+// int   usat      = 0;
+// float accuracy  = 0;
+// int   year      = 0;
+// int   month     = 0;
+// int   day       = 0;
+// int   hour      = 0;
+// int   minute    = 0;
+// int   second    = 0;
 
-unsigned long gpsInterval = 2000;
-unsigned long gpsCurrTime = 0;
-unsigned long gpsPrevTime = 0;
+// unsigned long gpsInterval = 2000;
+// unsigned long gpsCurrTime = 0;
+// unsigned long gpsPrevTime = 0;
 
-//Http Client
-const char serverAddress[] = "dweet.io";  // server address
-const int port = 80;
+// //Http Client
+// const char serverAddress[] = "dweet.io";  // server address
+// const int port = 80;
 
-String dweetName = "possibility-realize-galaxy";
-String path = "/dweet/for/" + dweetName;
-String contentType = "application/json";
-String postData;
+// String dweetName = "possibility-realize-galaxy";
+// String path = "/dweet/for/" + dweetName;
+// String contentType = "application/json";
+// String postData;
 
-TinyGsmClient client(modem);
-// HttpClient    http = HttpClient(client, serverAddress, port);
+// TinyGsmClient client(modem);
+// // HttpClient    http = HttpClient(client, serverAddress, port);
 
 I2C_AXP192 axp192(I2C_AXP192_DEFAULT_ADDRESS, Wire1);
 
 void IRAM_ATTR timeInterval(){
   spdCurrTime = millis();
-  digitalWrite(LED_PIN, LOW);
+  // digitalWrite(LED_PIN, LOW);
+}
+
+static uint16_t crc16_ccitt_false(const uint8_t *data, size_t len) {
+  uint16_t crc = 0xFFFF;
+
+  for (size_t i = 0; i < len; i++) {
+    crc ^= (uint16_t)data[i] << 8;
+
+    for (int bit = 0; bit < 8; bit++) {
+      if (crc & 0x8000) {
+        crc = (crc << 1) ^ 0x1021;
+      } else {
+        crc <<= 1;
+      }
+    }
+  }
+
+  return crc;
+}
+
+static void put_u16_be(uint8_t *p, uint16_t v) {
+  p[0] = (uint8_t)(v >> 8);
+  p[1] = (uint8_t)(v & 0xFF);
+}
+
+static void put_u32_be(uint8_t *p, uint32_t v) {
+  p[0] = (uint8_t)(v >> 24);
+  p[1] = (uint8_t)(v >> 16);
+  p[2] = (uint8_t)(v >> 8);
+  p[3] = (uint8_t)(v & 0xFF);
+}
+
+static bool build_payload(uint8_t payload[PAYLOAD_LEN], const uint8_t *appData, size_t appLen) {
+  if (appLen > 13) return false;
+
+  memset(payload, 0, PAYLOAD_LEN);
+
+  payload[0] = MAGIC;
+  payload[1] = PROTOCOL_VER;
+
+  put_u16_be(&payload[2], PARENT_ADDR);
+  put_u32_be(&payload[4], seq);
+  put_u32_be(&payload[8], millis());
+  put_u16_be(&payload[12], appCounter);
+
+  memcpy(&payload[14], appData, appLen);
+
+  uint16_t crc = crc16_ccitt_false(payload, 27);
+  put_u16_be(&payload[27], crc);
+
+  return true;
+}
+
+static void print_hex(const uint8_t *data, size_t len) {
+  for (size_t i = 0; i < len; i++) {
+    Serial.printf("%02X ", data[i]);
+  }
+  Serial.println();
+}
+
+static void setup_lora_config() {
+  lora.SetDefaultConfigValue(config);
+
+  config.own_address = PARENT_ADDR;
+
+  // Keep UART at 9600 because the attached library starts SerialLoRa with LoRa_BaudRate=9600.
+  config.baud_rate = 0b011;       // 9600 bps
+
+  // Fast air rate: SF5 / BW500kHz
+  // config.air_data_rate = 0b00010;
+  // Default: SF9 / BW125kHz
+  config.air_data_rate = 0b10000;
+
+  // Payload/sub-packet size 32 bytes
+  config.subpacket_size = 0b11;   // 32 bytes
+
+  // RSSI ambient noise measurement disabled
+  config.rssi_ambient_noise_flag = 0b0;
+
+  // 13 dBm
+  config.transmitting_power = 0b01;
+
+  config.own_channel = LORA_CH;
+
+  // Keep enabled because receiveFrame() in the attached library expects RSSI byte.
+  config.rssi_byte_flag = 0b1;
+
+  // Fixed-block mode
+  config.transmission_method_type = 0b1;
+
+  // WOR is not used in normal mode; keep a valid value.
+  config.wor_cycle = 0b001;       // 1000 ms
+
+  // Same key must be set on parent and child.
+  config.encryption_key = 0x0000;
+
+  config.target_address = USE_BROADCAST ? BROADCAST_ADDR : CHILD_ADDR;
+  config.target_channel = LORA_CH;
 }
 
 int rotX(int cx, int r, int deg) {
@@ -297,22 +418,44 @@ void setup() {
   interrupts();
 
   Serial.begin(115200);
-  delay(10);
+  delay(900);
 
   // Onboard LED light, it can be used freely
-  pinMode(LED_PIN, OUTPUT);
-  digitalWrite(LED_PIN, LOW);
+  // pinMode(LED_PIN, OUTPUT);
+  // digitalWrite(LED_PIN, LOW);
 
-  // POWER_PIN : This pin controls the power supply of the SIM7600
-  pinMode(POWER_PIN, OUTPUT);
+  // // POWER_PIN : This pin controls the power supply of the SIM7600
+  // pinMode(POWER_PIN, OUTPUT);
 
-  // PWR_PIN ： This Pin is the PWR-KEY of the SIM7600
-  // The time of active low level impulse of PWRKEY pin to power on module , type 500 ms
-  pinMode(PWR_PIN, OUTPUT);
+  // // PWR_PIN ： This Pin is the PWR-KEY of the SIM7600
+  // // The time of active low level impulse of PWRKEY pin to power on module , type 500 ms
+  // pinMode(PWR_PIN, OUTPUT);
 
   //Hall sensor interrupt setting
   pinMode(sensor, INPUT);
   attachInterrupt(sensor, timeInterval, RISING);
+
+  //LoRa module initilization
+  Serial.println();
+  Serial.println("E220-900T22S(JP) parent transmitter");
+
+  pinMode(LoRa_AUXPin, INPUT);
+
+  setup_lora_config();
+
+  delay(100);
+
+  int ret = lora.InitLoRaModule(config);
+  Serial.printf("InitLoRaModule ret=%d\n", ret);
+
+  lora.SwitchToNormalMode();
+
+  Serial.print("Target: ");
+  if (USE_BROADCAST) {
+    Serial.println("broadcast");
+  } else {
+    Serial.printf("unicast 0x%04X\n", CHILD_ADDR);
+  }
 
 }
 
@@ -334,22 +477,61 @@ void loop() {
   // 8 normal
   // 9 error
 
+  const uint32_t now = millis();
+
+  if (now - lastSendMs >= 1000) {
+    lastSendMs = now;
+
+    uint8_t payload[PAYLOAD_LEN];
+    uint8_t appData[13];
+
+    // 例: ここで外部データ・センサー値・状態値などを詰める
+    memset(appData, 0, sizeof(appData));
+
+    appData[0] = 0x01;  // data type
+    appData[1] = 0x23;  // status
+
+    uint16_t value1 = 1234;
+    uint16_t value2 = 5678;
+
+    put_u16_be(&appData[2], value1);
+    put_u16_be(&appData[4], value2);
+
+    if (!build_payload(payload, appData, sizeof(appData))) {
+      Serial.println("build_payload failed");
+      return;
+    }
+
+    Serial.printf("TX seq=%lu appCounter=%u payload=",
+                  (unsigned long)seq,
+                  appCounter);
+    print_hex(payload, PAYLOAD_LEN);
+
+    int ret = lora.SendFrame(config, payload, PAYLOAD_LEN);
+    if (ret != 0) {
+      Serial.printf("SendFrame failed ret=%d\n", ret);
+    }
+
+    seq++;
+    appCounter++;
+  }
+
   if(isOnline){
     switch(networkState){
       case 0:
         // POWER_PIN : This pin controls the power supply of the SIM7600
-        digitalWrite(POWER_PIN, HIGH); 
+        // digitalWrite(POWER_PIN, HIGH); 
         networkState = 1;
-        SerialMon.println("networkState 0 -> 1");
+        // SerialMon.println("networkState 0 -> 1");
         netInterval = 500;
         netPrevTime = millis();
-        digitalWrite(PWR_PIN, HIGH);
+        // digitalWrite(PWR_PIN, HIGH);
         break;
       case 1:
         if((netCurrTime - netPrevTime) >= netInterval){
-          digitalWrite(PWR_PIN, LOW);
-          networkState = 2;
-          SerialMon.println("networkState 1 -> 2");
+          // digitalWrite(PWR_PIN, LOW);
+          networkState = 8;
+          // SerialMon.println("networkState 1 -> 2");
         }
         break;
       case 2:
@@ -364,47 +546,47 @@ void loop() {
         //   //   digitalWrite(LED_PIN, !digitalRead(LED_PIN));
         //   // });
         // }, CHANGE);
-        netInterval = 3000;
-        netPrevTime = millis();
-        networkState = 3;
-        SerialMon.println("networkState 2 -> 3");
+        // netInterval = 3000;
+        // netPrevTime = millis();
+        // networkState = 3;
+        // SerialMon.println("networkState 2 -> 3");
         break;
       case 3:
-        if((netCurrTime - netPrevTime) >= netInterval){
-          SerialMon.println("Wait...");
-          SerialAT.begin(UART_BAUD, SERIAL_8N1, PIN_RX, PIN_TX);
-          networkState = 4;
-          SerialMon.println("networkState 3 -> 4");
-        }
+        // if((netCurrTime - netPrevTime) >= netInterval){
+        //   // SerialMon.println("Wait...");
+        //   // SerialAT.begin(UART_BAUD, SERIAL_8N1, PIN_RX, PIN_TX);
+        //   networkState = 4;
+        //   SerialMon.println("networkState 3 -> 4");
+        // }
         break;
       case 4:
-        SerialMon.println("Initializing modem...");
-        if (!modem.init()) {
-          SerialMon.println("Failed to restart modem, delaying 10s and retrying");
-          //isOnline = false;
-          //return;
-        }
-        SerialMon.println("enter setNetwork Mode");
-        networkState = 5;
-        SerialMon.println("networkState 4 -> 5");
+        // SerialMon.println("Initializing modem...");
+        // if (!modem.init()) {
+        //   SerialMon.println("Failed to restart modem, delaying 10s and retrying");
+        //   //isOnline = false;
+        //   //return;
+        // }
+        // SerialMon.println("enter setNetwork Mode");
+        // networkState = 5;
+        // SerialMon.println("networkState 4 -> 5");
         break;
       case 5:
-        bool result;
-        result = modem.setNetworkMode(38);
-        if (modem.waitResponse(10000L) != 1){
-          SerialMon.println("setNetworkMode fail");
-        }
-        networkState = 6;
-        SerialMon.println("networkState 5 -> 6");
+        // bool result;
+        // result = modem.setNetworkMode(38);
+        // if (modem.waitResponse(10000L) != 1){
+        //   SerialMon.println("setNetworkMode fail");
+        // }
+        // networkState = 6;
+        // SerialMon.println("networkState 5 -> 6");
         break;
       case 6:
-        SerialMon.print("Connecting to:");
-        SerialMon.println(apn);
-        modem.gprsConnect(apn, gprsUser, gprsPass);
-        netInterval = 10000;
-        netPrevTime = millis();
-        networkState = 7;
-        SerialMon.println("networkState 6 -> 7");
+        // SerialMon.print("Connecting to:");
+        // SerialMon.println(apn);
+        // modem.gprsConnect(apn, gprsUser, gprsPass);
+        // netInterval = 10000;
+        // netPrevTime = millis();
+        // networkState = 7;
+        // SerialMon.println("networkState 6 -> 7");
         // if (!modem.gprsConnect(apn, gprsUser, gprsPass)) {
         //   netInterval = 10000;
         //   netPrevTime = millis();
@@ -414,55 +596,55 @@ void loop() {
         // }
         break;
       case 7:
-        if((netCurrTime - netPrevTime) >= netInterval){
-            bool res = modem.isGprsConnected();
-            SerialMon.print("GPRS status:");
-            SerialMon.println(res);
+        // if((netCurrTime - netPrevTime) >= netInterval){
+        //     bool res = modem.isGprsConnected();
+        //     SerialMon.print("GPRS status:");
+        //     SerialMon.println(res);
 
-            IPAddress local = modem.localIP();
-            SerialMon.print("Local IP:");
-            SerialMon.println(local);
+        //     IPAddress local = modem.localIP();
+        //     SerialMon.print("Local IP:");
+        //     SerialMon.println(local);
 
-            int csq = modem.getSignalQuality();
-            SerialMon.print("Signal quality:");
-            SerialMon.println(csq);
+        //     int csq = modem.getSignalQuality();
+        //     SerialMon.print("Signal quality:");
+        //     SerialMon.println(csq);
 
-          netInterval = 2000;
-          netPrevTime = millis();
-          networkState = 8;
-          SerialMon.println("networkState 7 -> 8");
-          if(modem.isNetworkConnected()){
-            SerialMon.println("Network Initialized");
-            isNetworkConnected = true;
-          }else{
-            digitalWrite(POWER_PIN, LOW);
-            digitalWrite(PWR_PIN, HIGH);
-            SerialMon.println("Offline mode");
-            isNetworkConnected = false;
-            isOnline = false;
-          }
-        }
+        //   netInterval = 2000;
+        //   netPrevTime = millis();
+        //   networkState = 8;
+        //   SerialMon.println("networkState 7 -> 8");
+        //   if(modem.isNetworkConnected()){
+        //     SerialMon.println("Network Initialized");
+        //     isNetworkConnected = true;
+        //   }else{
+        //     digitalWrite(POWER_PIN, LOW);
+        //     digitalWrite(PWR_PIN, HIGH);
+        //     SerialMon.println("Offline mode");
+        //     isNetworkConnected = false;
+        //     isOnline = false;
+        //   }
+        // }
         break;
       case 8:
-        if((netCurrTime - netPrevTime) >= netInterval){
-          dataPayload = "/dweet/for/possibility-realize-galaxy?Time="+String(timeTextbuf)
-                                                      // "&Latitude="+String(lat)+
-                                                      // "&Longtitude="+String(lon)+
-                                                      // "&Time(Sec)="+String((int)timeSechold)+
-                                                      +"&Speed="+String((int)WheelAvg)
-                                                      +"&Battery="+String(batCapacity)
-                                                      ;
-          HttpClient    http = HttpClient(client, serverAddress, port);
-          int err = http.get(dataPayload);
-          isDatabaseUploaded = true;
-          if (err != 0) {
-            SerialMon.println("failed to connect");
-            isDatabaseUploaded = false;
-          }
-          netInterval = 2000;
-          netPrevTime = millis();
-          networkState = 8;
-        }
+        // if((netCurrTime - netPrevTime) >= netInterval){
+        //   dataPayload = "/dweet/for/possibility-realize-galaxy?Time="+String(timeTextbuf)
+        //                                               // "&Latitude="+String(lat)+
+        //                                               // "&Longtitude="+String(lon)+
+        //                                               // "&Time(Sec)="+String((int)timeSechold)+
+        //                                               +"&Speed="+String((int)WheelAvg)
+        //                                               +"&Battery="+String(batCapacity)
+        //                                               ;
+        //   HttpClient    http = HttpClient(client, serverAddress, port);
+        //   int err = http.get(dataPayload);
+        //   isDatabaseUploaded = true;
+        //   if (err != 0) {
+        //     SerialMon.println("failed to connect");
+        //     isDatabaseUploaded = false;
+        //   }
+        //   netInterval = 2000;
+        //   netPrevTime = millis();
+        //   networkState = 8;
+        // }
         //networkState = 9;
         break;
       case 9:
@@ -515,7 +697,7 @@ void loop() {
 
       sprintf(timeTextbuf, "%02d:%02d", timeMinhold, (timeSechold)%60);
 
-      digitalWrite(LED_PIN, HIGH);
+      // digitalWrite(LED_PIN, HIGH);
 
       drawMeter(WheelAvg);
       dtostrf(WheelAvg, 2, 0, spdTexbuf);
