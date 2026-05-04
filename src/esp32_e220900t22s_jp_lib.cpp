@@ -11,6 +11,8 @@
 #include "esp32_e220900t22s_jp_lib.h"
 #include <vector>
 
+extern bool serialDebugEnabled;
+
 SemaphoreHandle_t xMutex;
 
 template<typename T>
@@ -242,16 +244,16 @@ int CLoRa::SendFrame(struct LoRaConfigItem_t &config, uint8_t *send_data, int si
 
   memmove(frame + 3, send_data, size);
 
-#if 1 /* print debug */
-  for (int i = 0; i < 3 + size; i++) {
-    if (i < 3) {
-      SerialMon.printf("%02x", frame[i]);
-    } else {
-      SerialMon.printf("%c", frame[i]);
+  if (serialDebugEnabled) {
+    for (int i = 0; i < 3 + size; i++) {
+      if (i < 3) {
+        SerialMon.printf("%02x", frame[i]);
+      } else {
+        SerialMon.printf("%c", frame[i]);
+      }
     }
+    SerialMon.printf("\n");
   }
-  SerialMon.printf("\n");
-#endif
 
   if (xSemaphoreTake(xMutex, (portTickType)100) == pdTRUE) {
     for (auto i : frame) {

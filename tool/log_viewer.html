@@ -1,0 +1,1356 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Vehicle Telemetry Log Viewer</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f5f7f8;
+      --panel: #ffffff;
+      --ink: #15212a;
+      --muted: #64717d;
+      --line: #d8e0e6;
+      --accent: #1267a5;
+      --accent-soft: #e7f2fb;
+      --warn: #a76700;
+      --warn-soft: #fff3d7;
+      --error: #b3261e;
+      --error-soft: #ffe7e5;
+      --ok: #146c43;
+      --ok-soft: #e6f4ec;
+      --shadow: 0 1px 2px rgba(21, 33, 42, 0.08);
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 14px;
+      line-height: 1.45;
+    }
+
+    header {
+      display: grid;
+      grid-template-columns: minmax(220px, 1fr) auto;
+      gap: 12px;
+      align-items: center;
+      padding: 12px 16px;
+      background: var(--panel);
+      border-bottom: 1px solid var(--line);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: 0;
+    }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      justify-content: flex-end;
+    }
+
+    button, select, input[type="file"]::file-selector-button {
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--ink);
+      border-radius: 6px;
+      padding: 7px 10px;
+      font: inherit;
+      cursor: pointer;
+    }
+
+    button.primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+      font-weight: 650;
+    }
+
+    button:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    main {
+      display: grid;
+      grid-template-columns: minmax(420px, 0.95fr) minmax(360px, 1.05fr);
+      gap: 12px;
+      padding: 12px;
+      min-height: calc(100vh - 58px);
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+      min-width: 0;
+    }
+
+    .left, .right {
+      display: grid;
+      gap: 12px;
+      align-content: start;
+    }
+
+    .section {
+      padding: 12px;
+    }
+
+    .section h2 {
+      margin: 0 0 10px;
+      font-size: 14px;
+      font-weight: 750;
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 128px;
+      resize: vertical;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 9px;
+      font: 12px/1.45 ui-monospace, SFMono-Regular, Consolas, monospace;
+      color: var(--ink);
+    }
+
+    .status-line {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 7px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: #fff;
+      white-space: nowrap;
+    }
+
+    .pill.ok { color: var(--ok); background: var(--ok-soft); border-color: #b9dfc8; }
+    .pill.warn { color: var(--warn); background: var(--warn-soft); border-color: #efd391; }
+    .pill.error { color: var(--error); background: var(--error-soft); border-color: #f2bab5; }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(120px, 1fr));
+      gap: 8px;
+    }
+
+    .metric {
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 8px;
+      min-height: 58px;
+      background: #fbfcfd;
+    }
+
+    .metric .label {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .metric .value {
+      display: block;
+      margin-top: 3px;
+      font-weight: 750;
+      font-size: 16px;
+      overflow-wrap: anywhere;
+    }
+
+    .messages {
+      display: grid;
+      gap: 6px;
+      margin-top: 10px;
+      max-height: 96px;
+      overflow: auto;
+    }
+
+    .message {
+      border-radius: 6px;
+      padding: 7px 9px;
+      border: 1px solid var(--line);
+      background: #fbfcfd;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .message.warn {
+      background: var(--warn-soft);
+      color: var(--warn);
+      border-color: #efd391;
+    }
+
+    .message.error {
+      background: var(--error-soft);
+      color: var(--error);
+      border-color: #f2bab5;
+    }
+
+    .table-tools, .graph-tools {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+
+    label.check {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--muted);
+      font-size: 13px;
+      user-select: none;
+    }
+
+    .table-wrap {
+      max-height: 390px;
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+    }
+
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      min-width: 1050px;
+      font-size: 12px;
+    }
+
+    th, td {
+      border-bottom: 1px solid var(--line);
+      padding: 6px 8px;
+      text-align: right;
+      white-space: nowrap;
+    }
+
+    th {
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      background: #eef3f6;
+      color: #30404c;
+      font-weight: 750;
+    }
+
+    th.left, td.left { text-align: left; }
+    tbody tr { cursor: pointer; }
+    tbody tr:hover { background: #f2f7fa; }
+    tbody tr.selected { background: var(--accent-soft); outline: 2px solid var(--accent); outline-offset: -2px; }
+    tbody tr.warn { background: var(--warn-soft); }
+    tbody tr.error { background: var(--error-soft); }
+    tbody tr.muted { color: #7d8790; background: #f3f4f5; }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 410px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fff;
+    }
+
+    .detail {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    pre {
+      margin: 0;
+      padding: 10px;
+      max-height: 190px;
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fbfcfd;
+      font: 12px/1.45 ui-monospace, SFMono-Regular, Consolas, monospace;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+
+    .tooltip {
+      position: fixed;
+      display: none;
+      pointer-events: none;
+      z-index: 20;
+      max-width: 280px;
+      padding: 8px 10px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.98);
+      box-shadow: 0 4px 18px rgba(21, 33, 42, 0.16);
+      font-size: 12px;
+      color: var(--ink);
+    }
+
+    @media (max-width: 980px) {
+      header { grid-template-columns: 1fr; }
+      .toolbar { justify-content: flex-start; }
+      main { grid-template-columns: 1fr; }
+      .summary-grid { grid-template-columns: repeat(2, minmax(120px, 1fr)); }
+      .detail { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Vehicle Telemetry Log Viewer</h1>
+    <div class="toolbar">
+      <input id="fileInput" type="file" accept=".bin,.txt,.scub,text/plain,application/octet-stream">
+      <select id="baudRate" aria-label="Serial baud rate">
+        <option value="115200" selected>115200</option>
+        <option value="921600">921600</option>
+        <option value="57600">57600</option>
+        <option value="38400">38400</option>
+        <option value="9600">9600</option>
+      </select>
+      <button id="serialConnectBtn" type="button">Connect Serial</button>
+      <button id="logDumpBtn" type="button" disabled>LOGDUMP</button>
+      <button id="serialDisconnectBtn" type="button" disabled>Disconnect</button>
+      <button id="parseBtn" class="primary" type="button">Parse</button>
+      <button id="exportBtn" type="button" disabled>CSV Export</button>
+      <button id="clearBtn" type="button">Clear</button>
+    </div>
+  </header>
+
+  <main>
+    <div class="left">
+      <section class="panel section">
+        <h2>Input</h2>
+        <textarea id="pasteInput" spellcheck="false" placeholder="ESP32 serial output, SCUB_HEX_BEGIN dump, Payload: lines, or hex bytes"></textarea>
+        <div id="statusLine" class="status-line">
+          <span class="pill">Waiting for input</span>
+        </div>
+      </section>
+
+      <section class="panel section">
+        <h2>Summary</h2>
+        <div id="summaryGrid" class="summary-grid"></div>
+        <div id="messages" class="messages"></div>
+      </section>
+
+      <section class="panel section">
+        <div class="table-tools">
+          <h2>Records</h2>
+          <div>
+            <label class="check"><input id="hideDup" type="checkbox"> Hide duplicate/old</label>
+            <label class="check"><input id="showCrc" type="checkbox" checked> Show CRC error</label>
+            <label class="check"><input id="showNa" type="checkbox" checked> Show N/A</label>
+            <label class="check"><input id="showRaw" type="checkbox" checked> Show raw</label>
+            <label class="check"><input id="warningsOnly" type="checkbox"> Warnings only</label>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Seq</th>
+                <th>Rx ms</th>
+                <th>Elapsed</th>
+                <th>Speed</th>
+                <th>RPM</th>
+                <th>Throttle</th>
+                <th>Temp1</th>
+                <th>Temp2</th>
+                <th class="left">Status</th>
+                <th>RSSI</th>
+                <th class="left">Flags</th>
+                <th class="left">Raw</th>
+              </tr>
+            </thead>
+            <tbody id="recordBody"></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
+    <div class="right">
+      <section class="panel section">
+        <div class="graph-tools">
+          <h2>Graph</h2>
+          <div>
+            <select id="metricSelect" aria-label="Graph metric">
+              <option value="speed_kmh">Speed km/h</option>
+              <option value="rpm">RPM</option>
+              <option value="rssi">RSSI dBm</option>
+              <option value="temp1_c">Temperature 1</option>
+              <option value="temp2_c">Temperature 2</option>
+              <option value="throttle_percent">Throttle %</option>
+              <option value="packet_loss_before">Packet loss</option>
+            </select>
+            <select id="xSelect" aria-label="X axis">
+              <option value="elapsed_ms">Elapsed time</option>
+              <option value="index">Record index</option>
+              <option value="sequence_number">Sequence number</option>
+              <option value="rx_time_ms">Rx time</option>
+              <option value="tx_millis">Tx millis</option>
+            </select>
+            <label class="check"><input id="showLoss" type="checkbox" checked> Loss markers</label>
+          </div>
+        </div>
+        <canvas id="chart" width="960" height="520"></canvas>
+      </section>
+
+      <section class="panel section">
+        <h2>Detail</h2>
+        <div class="detail">
+          <pre id="detailRecord">No record selected.</pre>
+          <pre id="detailApp"></pre>
+          <pre id="detailWarn"></pre>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <div id="tooltip" class="tooltip"></div>
+
+  <script>
+    const LOG_HEADER_LEN = 32;
+    const LOG_RECORD_LEN = 24;
+    const LOG_SUMMARY_LEN = 32;
+    const APP_DATA_LEN = 13;
+    const FLAG_CRC_OK = 0x01;
+    const FLAG_LOSS_BEFORE = 0x02;
+    const FLAG_DUP_OLD = 0x04;
+    const FLAG_APP_VALID = 0x08;
+
+    const el = {
+      fileInput: document.getElementById("fileInput"),
+      pasteInput: document.getElementById("pasteInput"),
+      baudRate: document.getElementById("baudRate"),
+      serialConnectBtn: document.getElementById("serialConnectBtn"),
+      logDumpBtn: document.getElementById("logDumpBtn"),
+      serialDisconnectBtn: document.getElementById("serialDisconnectBtn"),
+      parseBtn: document.getElementById("parseBtn"),
+      exportBtn: document.getElementById("exportBtn"),
+      clearBtn: document.getElementById("clearBtn"),
+      statusLine: document.getElementById("statusLine"),
+      summaryGrid: document.getElementById("summaryGrid"),
+      messages: document.getElementById("messages"),
+      recordBody: document.getElementById("recordBody"),
+      hideDup: document.getElementById("hideDup"),
+      showCrc: document.getElementById("showCrc"),
+      showNa: document.getElementById("showNa"),
+      showRaw: document.getElementById("showRaw"),
+      warningsOnly: document.getElementById("warningsOnly"),
+      metricSelect: document.getElementById("metricSelect"),
+      xSelect: document.getElementById("xSelect"),
+      showLoss: document.getElementById("showLoss"),
+      chart: document.getElementById("chart"),
+      detailRecord: document.getElementById("detailRecord"),
+      detailApp: document.getElementById("detailApp"),
+      detailWarn: document.getElementById("detailWarn"),
+      tooltip: document.getElementById("tooltip")
+    };
+
+    const state = {
+      sourceName: "",
+      bytes: null,
+      result: emptyResult(),
+      selectedIndex: null,
+      graphPoints: [],
+      serialPort: null,
+      serialReader: null,
+      serialConnected: false,
+      serialBusy: false,
+      serialMessage: ""
+    };
+
+    function emptyResult() {
+      return {
+        inputType: "No input",
+        records: [],
+        fileHeader: null,
+        summaryBlock: null,
+        summarySource: "Recalculated",
+        recalc: {},
+        warnings: [],
+        errors: [],
+        invalidLines: [],
+        invalidRecordCount: 0
+      };
+    }
+
+    function u16(b, o) { return ((b[o] << 8) | b[o + 1]) >>> 0; }
+    function i16(b, o) { const v = u16(b, o); return v & 0x8000 ? v - 0x10000 : v; }
+    function u32(b, o) { return ((b[o] * 0x1000000) + ((b[o + 1] << 16) | (b[o + 2] << 8) | b[o + 3])) >>> 0; }
+    function i8(v) { return v & 0x80 ? v - 0x100 : v; }
+    function hexByte(v) { return v.toString(16).toUpperCase().padStart(2, "0"); }
+    function hexBytes(bytes) { return Array.from(bytes, hexByte).join(" "); }
+    function ascii(bytes, o, n) { return String.fromCharCode(...bytes.slice(o, o + n)); }
+    function fmt(v, digits = 1) { return Number.isFinite(v) ? v.toFixed(digits) : "N/A"; }
+    function display(v, suffix = "", digits = 1) { return Number.isFinite(v) ? `${v.toFixed(digits)}${suffix}` : "N/A"; }
+
+    function crc8Atm(bytes, len = bytes.length) {
+      let crc = 0;
+      for (let i = 0; i < len; i++) {
+        crc ^= bytes[i];
+        for (let bit = 0; bit < 8; bit++) {
+          crc = (crc & 0x80) ? ((crc << 1) ^ 0x07) & 0xFF : (crc << 1) & 0xFF;
+        }
+      }
+      return crc;
+    }
+
+    function crc16CcittFalse(bytes, len = bytes.length) {
+      let crc = 0xFFFF;
+      for (let i = 0; i < len; i++) {
+        crc ^= bytes[i] << 8;
+        for (let bit = 0; bit < 8; bit++) {
+          crc = (crc & 0x8000) ? ((crc << 1) ^ 0x1021) & 0xFFFF : (crc << 1) & 0xFFFF;
+        }
+      }
+      return crc;
+    }
+
+    function decodeAppData(bytes) {
+      const warnings = [];
+      if (!bytes || bytes.length !== APP_DATA_LEN) {
+        return { valid: false, warnings: ["Application data length is not 13 bytes"], raw_hex: "" };
+      }
+      const dataType = bytes[0];
+      const statusFlags = bytes[1];
+      const measuring = Boolean(statusFlags & 0x01);
+      const paused = Boolean(statusFlags & 0x02);
+      let status = "Stopped";
+      if (measuring && !paused) status = "Measuring";
+      if (!measuring && paused) status = "Paused";
+      if (measuring && paused) {
+        status = "Invalid";
+        warnings.push("MEASURING and PAUSED are both set");
+      }
+      if (statusFlags & 0xF8) warnings.push(`Reserved status bits are set: 0x${hexByte(statusFlags & 0xF8)}`);
+      if (statusFlags & 0x04) warnings.push("SENSOR_ERROR is set");
+
+      const speedX10 = u16(bytes, 2);
+      const rpmX100 = u16(bytes, 4);
+      const throttleRaw = bytes[6];
+      const temp1Raw = i16(bytes, 7);
+      const temp2Raw = i16(bytes, 9);
+      const reserved = u16(bytes, 11);
+      if (dataType !== 0x01) warnings.push(`Unsupported application data type: 0x${hexByte(dataType)}`);
+      if (reserved !== 0) warnings.push(`Reserved field is non-zero: 0x${reserved.toString(16).toUpperCase().padStart(4, "0")}`);
+
+      return {
+        valid: dataType === 0x01,
+        data_type: dataType,
+        status_flags: statusFlags,
+        status,
+        speed_x10: speedX10,
+        rpm_x100: rpmX100,
+        throttle_raw: throttleRaw,
+        temp1_x10: temp1Raw,
+        temp2_x10: temp2Raw,
+        reserved,
+        speed_kmh: speedX10 / 10,
+        rpm: rpmX100 * 100,
+        throttle_percent: throttleRaw === 0xFF ? null : throttleRaw * 100 / 255,
+        temp1_c: temp1Raw === -32768 ? null : temp1Raw / 10,
+        temp2_c: temp2Raw === -32768 ? null : temp2Raw / 10,
+        raw_hex: hexBytes(bytes),
+        warnings
+      };
+    }
+
+    function normalizeRecord(base, appBytes, recordWarnings = []) {
+      const app = decodeAppData(appBytes);
+      const warnings = [...recordWarnings, ...app.warnings];
+      return {
+        index: base.index,
+        sequence_number: base.sequence_number ?? null,
+        rx_time_ms: base.rx_time_ms ?? null,
+        tx_millis: base.tx_millis ?? null,
+        elapsed_ms: null,
+        rssi: base.rssi ?? null,
+        record_flags: base.record_flags ?? null,
+        crc_status: base.crc_status ?? "unknown",
+        packet_loss_before: base.packet_loss_before ?? 0,
+        duplicate_or_old: base.duplicate_or_old ?? false,
+        transport_crc_ok: base.transport_crc_ok ?? null,
+        valid: app.valid && base.crc_status !== "CRC8 error",
+        application_data: Array.from(appBytes),
+        ...app,
+        warnings
+      };
+    }
+
+    function parseFullBinaryLog(bytes, result) {
+      result.inputType = "Full binary log";
+      const header = {
+        magic: ascii(bytes, 0, 4),
+        format_version: bytes[4],
+        record_size: bytes[5],
+        sample_period_ms: u16(bytes, 6),
+        start_time_unix: u32(bytes, 8),
+        record_count: u32(bytes, 12),
+        lost_record_count: u32(bytes, 16),
+        flags: u32(bytes, 20),
+        has_summary: Boolean(u32(bytes, 20) & 0x01),
+        time_valid: Boolean(u32(bytes, 20) & 0x02),
+        closed_cleanly: Boolean(u32(bytes, 20) & 0x04)
+      };
+      result.fileHeader = header;
+      if (header.format_version !== 1) result.warnings.push(`Unsupported log format version: ${header.format_version}`);
+      if (header.record_size !== LOG_RECORD_LEN) result.warnings.push(`Record size is ${header.record_size}, expected 24`);
+      if (!header.closed_cleanly) result.warnings.push("Log was not marked closed cleanly");
+
+      let offset = LOG_HEADER_LEN;
+      let expected = header.record_count === 0xFFFFFFFF ? Infinity : header.record_count;
+      let count = 0;
+      while (offset + LOG_RECORD_LEN <= bytes.length) {
+        if (ascii(bytes, offset, 4) === "SUMM") break;
+        if (count >= expected && expected !== Infinity) break;
+        result.records.push(parseLogRecord(bytes.slice(offset, offset + LOG_RECORD_LEN), result.records.length));
+        offset += LOG_RECORD_LEN;
+        count++;
+      }
+      if (expected !== Infinity && count !== expected) {
+        result.warnings.push(`Header record_count=${expected}, parsed=${count}`);
+      }
+      if (offset + LOG_SUMMARY_LEN <= bytes.length && ascii(bytes, offset, 4) === "SUMM") {
+        result.summaryBlock = parseSummaryBlock(bytes.slice(offset, offset + LOG_SUMMARY_LEN));
+        result.summarySource = "Summary Block";
+      } else if (header.has_summary) {
+        result.warnings.push("Summary Block is missing. Displaying recalculated summary values from decoded records.");
+      } else {
+        result.warnings.push("Summary Block is missing. Displaying recalculated summary values from decoded records.");
+      }
+    }
+
+    function parseLogRecord(recordBytes, index) {
+      const crc = crc8Atm(recordBytes, 23);
+      const flags = recordBytes[9];
+      const warnings = [];
+      const packetLoss = (flags & FLAG_LOSS_BEFORE) ? 1 : 0;
+      if (crc !== recordBytes[23]) warnings.push(`CRC8 mismatch: calc=0x${hexByte(crc)} stored=0x${hexByte(recordBytes[23])}`);
+      if (!(flags & FLAG_CRC_OK)) warnings.push("Transport CRC was not OK");
+      if (flags & FLAG_LOSS_BEFORE) warnings.push("Packet loss before this record");
+      if (flags & FLAG_DUP_OLD) warnings.push("Duplicate or old sequence number");
+      if (flags & 0xF0) warnings.push(`Reserved record flag bits are set: 0x${hexByte(flags & 0xF0)}`);
+      return normalizeRecord({
+        index,
+        sequence_number: u32(recordBytes, 0),
+        rx_time_ms: u32(recordBytes, 4),
+        rssi: i8(recordBytes[8]),
+        record_flags: flags,
+        crc_status: crc === recordBytes[23] ? "OK" : "CRC8 error",
+        packet_loss_before: packetLoss,
+        duplicate_or_old: Boolean(flags & FLAG_DUP_OLD),
+        transport_crc_ok: Boolean(flags & FLAG_CRC_OK)
+      }, recordBytes.slice(10, 23), warnings);
+    }
+
+    function parseSummaryBlock(bytes) {
+      return {
+        magic: ascii(bytes, 0, 4),
+        min_speed_kmh: u16(bytes, 4) / 10,
+        max_speed_kmh: u16(bytes, 6) / 10,
+        min_rpm: u16(bytes, 8) * 100,
+        max_rpm: u16(bytes, 10) * 100,
+        min_temp1_c: i16(bytes, 12) === -32768 ? null : i16(bytes, 12) / 10,
+        max_temp1_c: i16(bytes, 14) === -32768 ? null : i16(bytes, 14) / 10,
+        min_temp2_c: i16(bytes, 16) === -32768 ? null : i16(bytes, 16) / 10,
+        max_temp2_c: i16(bytes, 18) === -32768 ? null : i16(bytes, 18) / 10,
+        total_records: u32(bytes, 20),
+        lost_records: u32(bytes, 24),
+        crc32: u32(bytes, 28)
+      };
+    }
+
+    function parseRawRecordSequence(bytes, result, recordSize) {
+      result.inputType = recordSize === LOG_RECORD_LEN ? "LogRecord V1 sequence" : "Raw appData sequence";
+      for (let o = 0; o + recordSize <= bytes.length; o += recordSize) {
+        if (recordSize === LOG_RECORD_LEN) {
+          result.records.push(parseLogRecord(bytes.slice(o, o + recordSize), result.records.length));
+        } else {
+          result.records.push(normalizeRecord({ index: result.records.length }, bytes.slice(o, o + recordSize)));
+        }
+      }
+      const leftover = bytes.length % recordSize;
+      if (leftover) {
+        result.invalidRecordCount++;
+        result.warnings.push(`Ignored incomplete final record: ${leftover} bytes`);
+      }
+    }
+
+    function parseTransportPayload(bytes, index) {
+      const warnings = [];
+      if (bytes.length !== 29) warnings.push(`Payload length is ${bytes.length}, expected 29`);
+      if (bytes[0] !== 0xE2) warnings.push(`Transport magic mismatch: 0x${hexByte(bytes[0] ?? 0)}`);
+      if (bytes[1] !== 0x01) warnings.push(`Transport protocol version is ${bytes[1]}`);
+      let transportCrcOk = null;
+      if (bytes.length >= 29) {
+        const calc = crc16CcittFalse(bytes, 27);
+        const stored = u16(bytes, 27);
+        transportCrcOk = calc === stored;
+        if (!transportCrcOk) warnings.push(`Transport CRC16 mismatch: calc=0x${calc.toString(16).toUpperCase().padStart(4, "0")} stored=0x${stored.toString(16).toUpperCase().padStart(4, "0")}`);
+      }
+      return normalizeRecord({
+        index,
+        sequence_number: bytes.length >= 8 ? u32(bytes, 4) : null,
+        tx_millis: bytes.length >= 12 ? u32(bytes, 8) : null,
+        crc_status: transportCrcOk === null ? "unknown" : (transportCrcOk ? "OK" : "Transport CRC error"),
+        transport_crc_ok: transportCrcOk
+      }, bytes.slice(14, 27), warnings);
+    }
+
+    function extractTextBytes(text, result) {
+      const scubMatch = text.match(/SCUB_HEX_BEGIN[\s\S]*?\n([\s\S]*?)SCUB_HEX_END/i);
+      if (scubMatch) {
+        const hex = scubMatch[1].match(/[0-9A-Fa-f]{2}/g) || [];
+        return Uint8Array.from(hex.map(h => parseInt(h, 16)));
+      }
+
+      const payloadRecords = [];
+      const appRecords = [];
+      const looseHex = [];
+      text.split(/\r?\n/).forEach((line, idx) => {
+        const stripped = line.trim();
+        if (!stripped || stripped.startsWith("#") || stripped.startsWith("//") || stripped.startsWith(";")) return;
+        const afterLabel = stripped.match(/(?:Payload|payload|APP|appData)\s*[:=]\s*(.*)$/);
+        const target = afterLabel ? afterLabel[1] : stripped;
+        const tokens = target.match(/(?:0x)?[0-9A-Fa-f]{2}/g) || [];
+        const values = tokens.map(t => parseInt(t.replace(/^0x/i, ""), 16));
+        if (afterLabel && values.length >= 29) {
+          payloadRecords.push(Uint8Array.from(values.slice(0, 29)));
+        } else if (afterLabel && values.length >= 13) {
+          appRecords.push(Uint8Array.from(values.slice(0, 13)));
+        } else if (!afterLabel && values.length > 0 && /^[\s,;:xXa-fA-F0-9-]+$/.test(target)) {
+          looseHex.push(...values);
+        } else if (!afterLabel) {
+          result.invalidLines.push(idx + 1);
+        }
+      });
+
+      if (payloadRecords.length) {
+        result.inputType = "Serial Payload lines";
+        payloadRecords.forEach(rec => result.records.push(parseTransportPayload(rec, result.records.length)));
+        return null;
+      }
+      if (appRecords.length) {
+        result.inputType = "Serial appData lines";
+        appRecords.forEach(rec => result.records.push(normalizeRecord({ index: result.records.length }, rec)));
+        return null;
+      }
+      return looseHex.length ? Uint8Array.from(looseHex) : null;
+    }
+
+    function parseInput(bytes, text) {
+      const result = emptyResult();
+      let data = bytes;
+      if (text && !bytes) data = extractTextBytes(text, result);
+      if (result.records.length) return finalizeResult(result);
+      if (!data || data.length === 0) {
+        result.errors.push("Empty input or no hex bytes found");
+        return finalizeResult(result);
+      }
+
+      if (data.length >= 4 && ascii(data, 0, 4) === "SCUB") {
+        parseFullBinaryLog(data, result);
+      } else if (data.length % LOG_RECORD_LEN === 0) {
+        parseRawRecordSequence(data, result, LOG_RECORD_LEN);
+      } else if (data.length % APP_DATA_LEN === 0) {
+        parseRawRecordSequence(data, result, APP_DATA_LEN);
+      } else if (data.length >= 29 && data[0] === 0xE2) {
+        result.inputType = "Transport payload sequence";
+        for (let o = 0; o + 29 <= data.length; o += 29) {
+          result.records.push(parseTransportPayload(data.slice(o, o + 29), result.records.length));
+        }
+        if (data.length % 29) result.warnings.push(`Ignored trailing bytes: ${data.length % 29}`);
+      } else {
+        result.errors.push(`Unsupported binary length: ${data.length} bytes`);
+      }
+      return finalizeResult(result);
+    }
+
+    function finalizeResult(result) {
+      result.records.forEach((record, idx, records) => {
+        record.index = idx;
+        if (record.packet_loss_before === 0 && idx > 0 && record.sequence_number !== null && records[idx - 1].sequence_number !== null) {
+          const expected = records[idx - 1].sequence_number + 1;
+          if (record.sequence_number > expected) {
+            record.packet_loss_before = record.sequence_number - expected;
+            record.warnings.push(`Sequence gap: lost ${record.packet_loss_before}`);
+          } else if (record.sequence_number <= records[idx - 1].sequence_number) {
+            record.duplicate_or_old = true;
+            record.warnings.push("Duplicate or old sequence number");
+          }
+        }
+      });
+      const firstTime = result.records.find(r => Number.isFinite(r.rx_time_ms))?.rx_time_ms
+        ?? result.records.find(r => Number.isFinite(r.tx_millis))?.tx_millis
+        ?? 0;
+      result.records.forEach(r => {
+        const t = Number.isFinite(r.rx_time_ms) ? r.rx_time_ms : r.tx_millis;
+        r.elapsed_ms = Number.isFinite(t) ? t - firstTime : r.index;
+      });
+      if (result.invalidLines.length) result.warnings.push(`Invalid text lines: ${result.invalidLines.join(", ")}`);
+      result.invalidRecordCount += result.records.filter(r => !r.valid).length;
+      result.recalc = calculateSummary(result.records);
+      checkSummaryMismatch(result);
+      if (!result.records.length && !result.errors.length) result.errors.push("No decodable records found");
+      return result;
+    }
+
+    function calculateSummary(records) {
+      const valid = records.filter(r => r.valid);
+      const stat = key => {
+        const xs = valid.map(r => r[key]).filter(Number.isFinite);
+        if (!xs.length) return { min: null, max: null, avg: null };
+        return { min: Math.min(...xs), max: Math.max(...xs), avg: xs.reduce((a, b) => a + b, 0) / xs.length };
+      };
+      const speed = stat("speed_kmh");
+      const rpm = stat("rpm");
+      const temp1 = stat("temp1_c");
+      const temp2 = stat("temp2_c");
+      const rssi = stat("rssi");
+      return {
+        parsed_records: records.length,
+        valid_records: valid.length,
+        warning_records: records.filter(r => r.warnings.length).length,
+        invalid_records: records.length - valid.length,
+        packet_loss_count: records.reduce((sum, r) => sum + (r.packet_loss_before || 0), 0),
+        crc_error_count: records.filter(r => String(r.crc_status).includes("error")).length,
+        duplicate_or_old_count: records.filter(r => r.duplicate_or_old).length,
+        min_speed_kmh: speed.min,
+        max_speed_kmh: speed.max,
+        avg_speed_kmh: speed.avg,
+        min_rpm: rpm.min,
+        max_rpm: rpm.max,
+        avg_rpm: rpm.avg,
+        min_temp1_c: temp1.min,
+        max_temp1_c: temp1.max,
+        min_temp2_c: temp2.min,
+        max_temp2_c: temp2.max,
+        min_rssi: rssi.min,
+        max_rssi: rssi.max
+      };
+    }
+
+    function checkSummaryMismatch(result) {
+      const s = result.summaryBlock;
+      if (!s) return;
+      const r = result.recalc;
+      const mismatches = [];
+      const near = (a, b) => (a === null && b === null) || Math.abs(a - b) < 0.0001;
+      [
+        ["total_records", s.total_records, r.valid_records],
+        ["lost_records", s.lost_records, r.packet_loss_count],
+        ["min_speed_kmh", s.min_speed_kmh, r.min_speed_kmh],
+        ["max_speed_kmh", s.max_speed_kmh, r.max_speed_kmh],
+        ["min_rpm", s.min_rpm, r.min_rpm],
+        ["max_rpm", s.max_rpm, r.max_rpm]
+      ].forEach(([name, a, b]) => { if (!near(a, b)) mismatches.push(`${name}: summary=${a} recalc=${b}`); });
+      if (mismatches.length) result.warnings.push(`Summary mismatch: ${mismatches.join("; ")}`);
+    }
+
+    function filteredRecords() {
+      return state.result.records.filter(r => {
+        if (el.hideDup.checked && r.duplicate_or_old) return false;
+        if (!el.showCrc.checked && String(r.crc_status).includes("error")) return false;
+        if (el.warningsOnly.checked && !r.warnings.length) return false;
+        return true;
+      });
+    }
+
+    function render() {
+      renderStatus();
+      renderSummary();
+      renderTable();
+      drawChart();
+      renderDetail();
+      updateSerialControls();
+      el.exportBtn.disabled = state.result.records.length === 0;
+    }
+
+    function renderStatus() {
+      const r = state.result;
+      el.statusLine.innerHTML = "";
+      [
+        [r.inputType, ""],
+        [`records ${r.records.length}`, r.records.length ? "ok" : ""],
+        [`warnings ${r.warnings.length + r.recalc.warning_records || 0}`, r.warnings.length ? "warn" : ""],
+        [`errors ${r.errors.length}`, r.errors.length ? "error" : ""],
+        [`serial ${serialStatusText()}`, state.serialConnected ? "ok" : ""],
+        state.serialMessage ? [state.serialMessage, state.serialBusy ? "warn" : ""] : null,
+        state.sourceName ? [state.sourceName, ""] : null
+      ].filter(Boolean).forEach(([text, cls]) => {
+        const span = document.createElement("span");
+        span.className = `pill ${cls}`;
+        span.textContent = text;
+        el.statusLine.appendChild(span);
+      });
+    }
+
+    function serialStatusText() {
+      if (!("serial" in navigator)) return "unsupported";
+      if (state.serialBusy) return "receiving";
+      return state.serialConnected ? "connected" : "disconnected";
+    }
+
+    function updateSerialControls() {
+      const supported = "serial" in navigator;
+      el.serialConnectBtn.disabled = !supported || state.serialConnected || state.serialBusy;
+      el.logDumpBtn.disabled = !supported || !state.serialConnected || state.serialBusy;
+      el.serialDisconnectBtn.disabled = !supported || (!state.serialConnected && !state.serialBusy);
+      el.baudRate.disabled = state.serialConnected || state.serialBusy;
+    }
+
+    function renderSummary() {
+      const r = state.result;
+      const s = r.recalc;
+      const primary = r.summaryBlock && r.summarySource === "Summary Block" ? r.summaryBlock : null;
+      const items = [
+        ["Input type", r.inputType],
+        ["Parsed records", s.parsed_records ?? 0],
+        ["Valid / invalid", `${s.valid_records ?? 0} / ${s.invalid_records ?? 0}`],
+        ["Warning records", s.warning_records ?? 0],
+        ["Lost records", primary ? primary.lost_records : (s.packet_loss_count ?? 0)],
+        ["CRC errors", s.crc_error_count ?? 0],
+        ["File header", r.fileHeader ? "Yes" : "No"],
+        ["Summary block", r.summaryBlock ? "Yes" : "No"],
+        ["Summary source", r.summarySource],
+        ["Speed min/max/avg", `${display(s.min_speed_kmh)} / ${display(s.max_speed_kmh)} / ${display(s.avg_speed_kmh)}`],
+        ["RPM min/max/avg", `${fmt(s.min_rpm, 0)} / ${fmt(s.max_rpm, 0)} / ${fmt(s.avg_rpm, 0)}`],
+        ["RSSI min/max", `${fmt(s.min_rssi, 0)} / ${fmt(s.max_rssi, 0)}`]
+      ];
+      if (r.fileHeader) {
+        items.push(["Log version", r.fileHeader.format_version]);
+        items.push(["Sample period", `${r.fileHeader.sample_period_ms} ms`]);
+        items.push(["Header flags", `0x${r.fileHeader.flags.toString(16).toUpperCase().padStart(8, "0")}`]);
+      }
+      if (r.summaryBlock) {
+        items.push(["Summary speed", `${display(r.summaryBlock.min_speed_kmh)} / ${display(r.summaryBlock.max_speed_kmh)}`]);
+        items.push(["Summary RPM", `${fmt(r.summaryBlock.min_rpm, 0)} / ${fmt(r.summaryBlock.max_rpm, 0)}`]);
+      }
+      el.summaryGrid.innerHTML = items.map(([label, value]) => `<div class="metric"><span class="label">${escapeHtml(label)}</span><span class="value">${escapeHtml(String(value))}</span></div>`).join("");
+      el.messages.innerHTML = "";
+      [...r.errors.map(m => ["error", m]), ...r.warnings.map(m => ["warn", m])].slice(0, 20).forEach(([type, msg]) => {
+        const div = document.createElement("div");
+        div.className = `message ${type}`;
+        div.textContent = msg;
+        el.messages.appendChild(div);
+      });
+    }
+
+    function renderTable() {
+      const rows = filteredRecords();
+      const html = rows.map(r => {
+        const cls = [
+          r.index === state.selectedIndex ? "selected" : "",
+          String(r.crc_status).includes("error") ? "error" : "",
+          r.warnings.length || r.packet_loss_before ? "warn" : "",
+          r.duplicate_or_old ? "muted" : ""
+        ].filter(Boolean).join(" ");
+        return `<tr class="${cls}" data-index="${r.index}">
+          <td>${r.index}</td>
+          <td>${n(r.sequence_number)}</td>
+          <td>${n(r.rx_time_ms)}</td>
+          <td>${displayMs(r.elapsed_ms)}</td>
+          <td>${showValue(display(r.speed_kmh))}</td>
+          <td>${showValue(fmt(r.rpm, 0))}</td>
+          <td>${showValue(display(r.throttle_percent, "%"))}</td>
+          <td>${showValue(display(r.temp1_c, " C"))}</td>
+          <td>${showValue(display(r.temp2_c, " C"))}</td>
+          <td class="left">${escapeHtml(r.status ?? "N/A")}</td>
+          <td>${n(r.rssi)}</td>
+          <td class="left">${escapeHtml(flagText(r))}</td>
+          <td class="left">${el.showRaw.checked ? escapeHtml(r.raw_hex) : ""}</td>
+        </tr>`;
+      }).join("");
+      el.recordBody.innerHTML = html || `<tr><td class="left" colspan="13">No records</td></tr>`;
+      el.recordBody.querySelectorAll("tr[data-index]").forEach(row => {
+        row.addEventListener("click", () => selectRecord(Number(row.dataset.index), true));
+      });
+    }
+
+    function flagText(r) {
+      const flags = [];
+      if (r.crc_status) flags.push(r.crc_status);
+      if (r.packet_loss_before) flags.push(`lost ${r.packet_loss_before}`);
+      if (r.duplicate_or_old) flags.push("dup/old");
+      if (r.warnings.length) flags.push(`warn ${r.warnings.length}`);
+      return flags.join(", ");
+    }
+
+    function renderDetail() {
+      const r = state.result.records[state.selectedIndex];
+      if (!r) {
+        el.detailRecord.textContent = "No record selected.";
+        el.detailApp.textContent = "";
+        el.detailWarn.textContent = "";
+        return;
+      }
+      el.detailRecord.textContent = [
+        `index: ${r.index}`,
+        `sequence_number: ${n(r.sequence_number)}`,
+        `rx_time_ms: ${n(r.rx_time_ms)}`,
+        `tx_millis: ${n(r.tx_millis)}`,
+        `elapsed_ms: ${n(r.elapsed_ms)}`,
+        `rssi: ${n(r.rssi)}`,
+        `record_flags: ${r.record_flags === null ? "N/A" : "0x" + hexByte(r.record_flags)}`,
+        `crc_status: ${r.crc_status}`,
+        `packet_loss_before: ${r.packet_loss_before}`,
+        `duplicate_or_old: ${r.duplicate_or_old}`
+      ].join("\n");
+      el.detailApp.textContent = [
+        `data_type: 0x${hexByte(r.data_type ?? 0)}`,
+        `status_flags: 0x${hexByte(r.status_flags ?? 0)} (${r.status})`,
+        `speed_x10: ${n(r.speed_x10)} (${display(r.speed_kmh, " km/h")})`,
+        `rpm_x100: ${n(r.rpm_x100)} (${fmt(r.rpm, 0)} rpm)`,
+        `throttle: 0x${hexByte(r.throttle_raw ?? 0)} (${display(r.throttle_percent, "%")})`,
+        `temp1_x10: ${n(r.temp1_x10)} (${display(r.temp1_c, " C")})`,
+        `temp2_x10: ${n(r.temp2_x10)} (${display(r.temp2_c, " C")})`,
+        `reserved: 0x${(r.reserved ?? 0).toString(16).toUpperCase().padStart(4, "0")}`,
+        `raw: ${r.raw_hex}`
+      ].join("\n");
+      el.detailWarn.textContent = r.warnings.length ? r.warnings.join("\n") : "No record warnings.";
+    }
+
+    function drawChart() {
+      const canvas = el.chart;
+      const ctx = canvas.getContext("2d");
+      const dpr = window.devicePixelRatio || 1;
+      const rect = canvas.getBoundingClientRect();
+      canvas.width = Math.max(320, Math.floor(rect.width * dpr));
+      canvas.height = Math.max(260, Math.floor(rect.height * dpr));
+      ctx.scale(dpr, dpr);
+
+      const w = rect.width;
+      const h = rect.height;
+      ctx.clearRect(0, 0, w, h);
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(0, 0, w, h);
+      const pad = { l: 58, r: 18, t: 18, b: 42 };
+      const metric = el.metricSelect.value;
+      const xKey = el.xSelect.value;
+      const rows = filteredRecords().filter(r => Number.isFinite(r[xKey]) && Number.isFinite(r[metric]));
+      state.graphPoints = [];
+
+      ctx.strokeStyle = "#d8e0e6";
+      ctx.lineWidth = 1;
+      ctx.strokeRect(pad.l, pad.t, w - pad.l - pad.r, h - pad.t - pad.b);
+      if (!rows.length) {
+        ctx.fillStyle = "#64717d";
+        ctx.fillText("No graphable records", pad.l + 14, pad.t + 28);
+        return;
+      }
+
+      const xs = rows.map(r => r[xKey]);
+      const ys = rows.map(r => r[metric]);
+      let xMin = Math.min(...xs), xMax = Math.max(...xs);
+      let yMin = Math.min(...ys), yMax = Math.max(...ys);
+      if (xMin === xMax) { xMin -= 1; xMax += 1; }
+      if (yMin === yMax) { yMin -= 1; yMax += 1; }
+      const yPad = (yMax - yMin) * 0.08;
+      yMin -= yPad; yMax += yPad;
+      const px = x => pad.l + (x - xMin) / (xMax - xMin) * (w - pad.l - pad.r);
+      const py = y => h - pad.b - (y - yMin) / (yMax - yMin) * (h - pad.t - pad.b);
+
+      ctx.fillStyle = "#64717d";
+      ctx.font = "12px system-ui";
+      for (let i = 0; i <= 4; i++) {
+        const y = pad.t + i * (h - pad.t - pad.b) / 4;
+        const value = yMax - i * (yMax - yMin) / 4;
+        ctx.strokeStyle = "#edf1f4";
+        ctx.beginPath();
+        ctx.moveTo(pad.l, y);
+        ctx.lineTo(w - pad.r, y);
+        ctx.stroke();
+        ctx.fillText(formatAxis(value), 8, y + 4);
+      }
+      for (let i = 0; i <= 4; i++) {
+        const x = pad.l + i * (w - pad.l - pad.r) / 4;
+        const value = xMin + i * (xMax - xMin) / 4;
+        ctx.fillText(formatAxis(value), x - 14, h - 16);
+      }
+
+      ctx.strokeStyle = "#1267a5";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      rows.forEach((r, i) => {
+        const x = px(r[xKey]);
+        const y = py(r[metric]);
+        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      });
+      ctx.stroke();
+
+      rows.forEach(r => {
+        const x = px(r[xKey]);
+        const y = py(r[metric]);
+        state.graphPoints.push({ x, y, index: r.index, record: r });
+        ctx.beginPath();
+        ctx.fillStyle = r.index === state.selectedIndex ? "#b3261e" : (r.warnings.length ? "#a76700" : "#1267a5");
+        ctx.arc(x, y, r.index === state.selectedIndex ? 5 : 3, 0, Math.PI * 2);
+        ctx.fill();
+        if (el.showLoss.checked && r.packet_loss_before) {
+          ctx.strokeStyle = "#b3261e";
+          ctx.beginPath();
+          ctx.moveTo(x, pad.t);
+          ctx.lineTo(x, h - pad.b);
+          ctx.stroke();
+        }
+      });
+    }
+
+    function selectRecord(index, scroll) {
+      state.selectedIndex = index;
+      renderTable();
+      drawChart();
+      renderDetail();
+      if (scroll) {
+        const row = el.recordBody.querySelector(`tr[data-index="${index}"]`);
+        row?.scrollIntoView({ block: "nearest" });
+      }
+    }
+
+    function exportCsv() {
+      const rows = filteredRecords();
+      const columns = ["index","sequence_number","rx_time_ms","elapsed_ms","rssi","status","speed_kmh","rpm","throttle_percent","temp1_c","temp2_c","flags","app_data_hex","warnings"];
+      const csv = [
+        columns.join(","),
+        ...rows.map(r => [
+          r.index, r.sequence_number, r.rx_time_ms, r.elapsed_ms, r.rssi, r.status,
+          val(r.speed_kmh), val(r.rpm), val(r.throttle_percent), val(r.temp1_c), val(r.temp2_c),
+          flagText(r), r.raw_hex, r.warnings.join("; ")
+        ].map(csvCell).join(","))
+      ].join("\n");
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "telemetry_records.csv";
+      a.click();
+      URL.revokeObjectURL(a.href);
+    }
+
+    function parseNow() {
+      state.result = parseInput(state.bytes, el.pasteInput.value);
+      state.selectedIndex = state.result.records.length ? 0 : null;
+      render();
+    }
+
+    async function connectSerial() {
+      if (!("serial" in navigator)) {
+        state.serialMessage = "Web Serial is not supported";
+        render();
+        return;
+      }
+      try {
+        state.serialMessage = "Selecting serial port";
+        state.serialBusy = true;
+        render();
+        const port = await navigator.serial.requestPort();
+        await port.open({ baudRate: Number(el.baudRate.value) || 115200 });
+        state.serialPort = port;
+        state.serialConnected = true;
+        state.serialMessage = "Serial connected";
+      } catch (error) {
+        state.serialMessage = `Serial connect failed: ${error.message}`;
+      } finally {
+        state.serialBusy = false;
+        render();
+      }
+    }
+
+    async function runSerialLogDump() {
+      if (!state.serialPort) return;
+      state.serialBusy = true;
+      state.serialMessage = "Sending LOGDUMP";
+      render();
+
+      let reader = null;
+      let timeoutId = null;
+      const decoder = new TextDecoder();
+      let text = "";
+      try {
+        const writer = state.serialPort.writable.getWriter();
+        await writer.write(new TextEncoder().encode("LOGDUMP\n"));
+        writer.releaseLock();
+
+        state.serialMessage = "Receiving SCUB_HEX log";
+        render();
+        reader = state.serialPort.readable.getReader();
+        state.serialReader = reader;
+        timeoutId = setTimeout(() => {
+          reader.cancel("LOGDUMP timeout").catch(() => {});
+        }, 30000);
+
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          if (value) {
+            text += decoder.decode(value, { stream: true });
+            el.pasteInput.value = text;
+            if (text.includes("SCUB_HEX_END")) break;
+          }
+        }
+        text += decoder.decode();
+
+        if (!text.includes("SCUB_HEX_BEGIN")) {
+          throw new Error("SCUB_HEX_BEGIN was not received");
+        }
+        if (!text.includes("SCUB_HEX_END")) {
+          throw new Error("SCUB_HEX_END was not received before timeout");
+        }
+
+        el.pasteInput.value = text;
+        state.bytes = null;
+        state.sourceName = "serial LOGDUMP";
+        state.serialMessage = "LOGDUMP received";
+        parseNow();
+      } catch (error) {
+        state.serialMessage = `LOGDUMP failed: ${error.message}`;
+        render();
+      } finally {
+        if (timeoutId) clearTimeout(timeoutId);
+        if (reader) {
+          try { reader.releaseLock(); } catch (_) {}
+        }
+        state.serialReader = null;
+        state.serialBusy = false;
+        render();
+      }
+    }
+
+    async function disconnectSerial() {
+      try {
+        if (state.serialReader) {
+          await state.serialReader.cancel("disconnect");
+        }
+        if (state.serialPort) {
+          await state.serialPort.close();
+        }
+        state.serialMessage = "Serial disconnected";
+      } catch (error) {
+        state.serialMessage = `Serial disconnect failed: ${error.message}`;
+      } finally {
+        state.serialReader = null;
+        state.serialPort = null;
+        state.serialConnected = false;
+        state.serialBusy = false;
+        render();
+      }
+    }
+
+    function n(v) { return Number.isFinite(v) ? String(v) : "N/A"; }
+    function val(v) { return Number.isFinite(v) ? v : ""; }
+    function showValue(s) { return !el.showNa.checked && s === "N/A" ? "" : s; }
+    function displayMs(v) { return Number.isFinite(v) ? `${(v / 1000).toFixed(3)}s` : "N/A"; }
+    function formatAxis(v) { return Math.abs(v) >= 1000 ? v.toFixed(0) : v.toFixed(1); }
+    function csvCell(v) {
+      const s = v === null || v === undefined ? "" : String(v);
+      return /[",\n]/.test(s) ? `"${s.replaceAll('"', '""')}"` : s;
+    }
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+    }
+
+    el.fileInput.addEventListener("change", async () => {
+      const file = el.fileInput.files?.[0];
+      if (!file) return;
+      state.sourceName = file.name;
+      const buf = await file.arrayBuffer();
+      if (file.type.startsWith("text/") || /\.(txt|log)$/i.test(file.name)) {
+        const text = new TextDecoder().decode(buf);
+        el.pasteInput.value = text;
+        state.bytes = null;
+      } else {
+        state.bytes = new Uint8Array(buf);
+        el.pasteInput.value = "";
+      }
+      parseNow();
+    });
+
+    el.parseBtn.addEventListener("click", () => {
+      state.sourceName = state.bytes ? state.sourceName : "pasted text";
+      parseNow();
+    });
+    el.serialConnectBtn.addEventListener("click", connectSerial);
+    el.logDumpBtn.addEventListener("click", runSerialLogDump);
+    el.serialDisconnectBtn.addEventListener("click", disconnectSerial);
+    el.exportBtn.addEventListener("click", exportCsv);
+    el.clearBtn.addEventListener("click", () => {
+      state.bytes = null;
+      state.sourceName = "";
+      state.result = emptyResult();
+      state.selectedIndex = null;
+      el.fileInput.value = "";
+      el.pasteInput.value = "";
+      render();
+    });
+    [el.hideDup, el.showCrc, el.showNa, el.showRaw, el.warningsOnly, el.metricSelect, el.xSelect, el.showLoss].forEach(control => {
+      control.addEventListener("change", render);
+    });
+    window.addEventListener("resize", drawChart);
+
+    el.chart.addEventListener("click", e => {
+      const p = nearestPoint(e);
+      if (p) selectRecord(p.index, true);
+    });
+    el.chart.addEventListener("mousemove", e => {
+      const p = nearestPoint(e);
+      if (!p) {
+        el.tooltip.style.display = "none";
+        return;
+      }
+      const r = p.record;
+      el.tooltip.innerHTML = escapeHtml([
+        `#${r.index} seq=${n(r.sequence_number)}`,
+        `elapsed=${displayMs(r.elapsed_ms)}`,
+        `speed=${display(r.speed_kmh, " km/h")} rpm=${fmt(r.rpm, 0)}`,
+        `throttle=${display(r.throttle_percent, "%")}`,
+        `temp1=${display(r.temp1_c, " C")} temp2=${display(r.temp2_c, " C")}`,
+        `rssi=${n(r.rssi)} status=${r.status}`,
+        `lost_before=${r.packet_loss_before}`,
+        r.raw_hex
+      ].join("\n")).replaceAll("\n", "<br>");
+      el.tooltip.style.display = "block";
+      el.tooltip.style.left = `${e.clientX + 12}px`;
+      el.tooltip.style.top = `${e.clientY + 12}px`;
+    });
+    el.chart.addEventListener("mouseleave", () => { el.tooltip.style.display = "none"; });
+
+    function nearestPoint(e) {
+      const rect = el.chart.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      let best = null;
+      let bestD = 12 * 12;
+      for (const p of state.graphPoints) {
+        const d = (p.x - x) ** 2 + (p.y - y) ** 2;
+        if (d < bestD) { bestD = d; best = p; }
+      }
+      return best;
+    }
+
+    render();
+  </script>
+</body>
+</html>
